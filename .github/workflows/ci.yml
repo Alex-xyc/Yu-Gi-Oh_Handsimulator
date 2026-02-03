@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir customtkinter pillow
+
+      - name: Run unit tests (headless)
+        # Use xvfb-run to provide a virtual frame buffer for tkinter/CTk
+        run: |
+          xvfb-run -s "-screen 0 1280x1024x24" python -m unittest discover -s tests -p "test_*.py"
