@@ -27,8 +27,7 @@ python src/gui.py
 Notes
 
 - The project is licensed under the MIT License — see the `LICENSE` file.
-- On Windows the app attempts to use `src/icons/ghattic.ico` for the taskbar icon.
-
+  
 Ownership
 This project and its source code are authored and maintained by Alex-xyc. See `LICENSE` for permitted uses.
 
