@@ -60,6 +60,59 @@ _card_name_cache: Dict[str, str] = {}
 _card_image_cache: Dict[str, str] = {}
 
 
+def _get_api_cache_path() -> str:
+    """Return path to the local API cache file."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_dir = os.path.join(script_dir, "cache")
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+    except Exception:
+        pass
+    return os.path.join(cache_dir, "deck_api_cache.json")
+
+
+def load_api_cache() -> None:
+    """Load cached API responses from disk into module-level caches."""
+    global _card_name_cache, _card_image_cache
+    path = _get_api_cache_path()
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            names = data.get("names", {}) or {}
+            images = data.get("images", {}) or {}
+            # replace existing small caches with persisted data
+            _card_name_cache = {str(k): str(v) for k, v in names.items()}
+            _card_image_cache = {str(k): str(v) for k, v in images.items()}
+    except Exception:
+        logging.exception("Failed to load API cache")
+
+
+def save_api_cache(names: Dict[str, str] = None, images: Dict[str, str] = None) -> None:
+    """Save provided or current caches to disk (overwrites existing cache).
+
+    This is used to persist the API responses for the current deck so future
+    runs do not need to re-query the remote API repeatedly.
+    """
+    global _card_name_cache, _card_image_cache
+    path = _get_api_cache_path()
+    try:
+        payload = {
+            "names": names if names is not None else _card_name_cache,
+            "images": images if images is not None else _card_image_cache,
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception:
+        logging.exception("Failed to save API cache")
+
+
+# Try loading any existing cache on import so repeated runs reuse it until
+# the user imports a new deck (which will overwrite the cache).
+load_api_cache()
+
+
 def fetch_card_name(card_id: str) -> str:
     """Fetch card name from YGOPRODeck API."""
     global _card_name_cache, _card_image_cache
@@ -93,6 +146,12 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
     """Fetch multiple card names from API."""
     global _card_name_cache, _card_image_cache
     result = {}
+
+    # Ensure we have the latest persisted cache loaded
+    try:
+        load_api_cache()
+    except Exception:
+        pass
 
     uncached_ids = [cid for cid in card_ids if cid not in _card_name_cache]
 
@@ -128,6 +187,11 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
                         _card_image_cache[card_id] = card['card_images'][0].get('image_url_small', '')
                 if verbose:
                     print(f"  Loaded {len(data['data'])} cards.")
+            # Persist the freshly fetched API responses so subsequent runs reuse them.
+            try:
+                save_api_cache()
+            except Exception:
+                pass
     except Exception:
         logging.exception("Failed to fetch multiple card names from API")
         for card_id in uncached_ids:
@@ -189,6 +253,8 @@ def load_ydk_code(deck: YuGiOhDeck, ydk_code: str, use_api: bool = True) -> bool
     deck.clear_deck()
     ydk_code = ydk_code.strip()
 
+    global _card_name_cache, _card_image_cache
+
     if ydk_code.startswith("ydke://"):
         print("Detected ydke:// format...")
         try:
@@ -225,6 +291,15 @@ def load_ydk_code(deck: YuGiOhDeck, ydk_code: str, use_api: bool = True) -> bool
 
     if use_api:
         card_database = fetch_multiple_card_names(list(set(card_ids)))
+        # Overwrite the persisted cache so it represents the current deck only.
+        try:
+            names = {str(k): str(v) for k, v in card_database.items()}
+            images = {str(k): str(_card_image_cache.get(k, "")) for k in names.keys()}
+            _card_name_cache = names
+            _card_image_cache = images
+            save_api_cache(names=names, images=images)
+        except Exception:
+            logging.exception("Failed to overwrite API cache for new deck")
     else:
         card_database = {}
 

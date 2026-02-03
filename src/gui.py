@@ -20,6 +20,36 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 import logging
 
+# Delegate image loading/resizing to a smaller module
+try:
+    import gui_components.image_manager as imgmgr
+    import gui_components.deck_manager as deckmgr
+    import gui_components.stats_manager as statsmgr
+except Exception:
+    # When running `src/gui.py` directly, package imports may fail.
+    # Ensure the `src` directory is on sys.path and fall back to top-level modules.
+    base_dir = os.path.dirname(__file__)
+    if base_dir not in sys.path:
+        sys.path.insert(0, base_dir)
+    try:
+        import gui_components.image_manager as imgmgr
+        import gui_components.deck_manager as deckmgr
+        import gui_components.stats_manager as statsmgr
+    except Exception:
+        import importlib
+        # Final fallback: try to import top-level compatibility modules if present.
+        try:
+            imgmgr = importlib.import_module("image_manager")
+        except Exception:
+            imgmgr = importlib.import_module("gui_components.image_manager")
+        try:
+            deckmgr = importlib.import_module("deck_manager")
+        except Exception:
+            deckmgr = importlib.import_module("gui_components.deck_manager")
+        try:
+            statsmgr = importlib.import_module("stats_manager")
+        except Exception:
+            statsmgr = importlib.import_module("gui_components.stats_manager")
 
 try:
     from PIL import Image, ImageTk
@@ -37,6 +67,7 @@ from main import (
     comb,
     get_image_cache
 )
+
 
 
 class YuGiOhHandSimulator(ctk.CTk):
@@ -124,114 +155,15 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=1)
 
-        # TOP SECTION: Deck Loading
-        deck_frame = ctk.CTkFrame(self)
-        deck_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        deck_frame.grid_columnconfigure(1, weight=1)
-
-        # Title
-        title_label = ctk.CTkLabel(deck_frame, text="Yu-Gi-Oh Hand Simulator By Xin Yuan",
-                                    font=ctk.CTkFont(size=24, weight="bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(10, 15))
-
-        # YDKE Code input
-        ydke_label = ctk.CTkLabel(deck_frame, text="YDKe Code:", font=ctk.CTkFont(size=14))
-        ydke_label.grid(row=1, column=0, padx=(15, 5), pady=5, sticky="w")
-
-        self.ydke_entry = ctk.CTkEntry(deck_frame, placeholder_text="Paste your ydke code here...",
-                                        width=500)
-        self.ydke_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-
-        load_ydke_btn = ctk.CTkButton(deck_frame, text="Load Deck", width=100,
-                                       command=self.load_from_ydke)
-        load_ydke_btn.grid(row=1, column=2, padx=(5, 15), pady=5)
-
-        # OR divider
-        or_label = ctk.CTkLabel(deck_frame, text="— OR —", font=ctk.CTkFont(size=12))
-        or_label.grid(row=2, column=0, columnspan=3, pady=5)
-
-        # File selection
-        file_label = ctk.CTkLabel(deck_frame, text="Load .ydk file:", font=ctk.CTkFont(size=14))
-        file_label.grid(row=3, column=0, padx=(15, 5), pady=5, sticky="w")
-
-        # Inline container so file name and Browse button sit next to each other
-        file_container = ctk.CTkFrame(deck_frame, fg_color="transparent")
-        # size to contents and stick to the left so button sits just after filename
-        file_container.grid(row=3, column=1, padx=5, pady=5, sticky="w")
-        file_container.grid_columnconfigure(0, weight=0)
-
-        self.file_path_label = ctk.CTkLabel(file_container, text="No file selected",
-                             font=ctk.CTkFont(size=12), text_color="gray")
-        self.file_path_label.grid(row=0, column=0, sticky="w")
-
-        browse_btn = ctk.CTkButton(file_container, text="Browse...", width=100,
-                        command=self.browse_file)
-        # small gap between filename and button
-        # small 5px gap between filename and button
-        browse_btn.grid(row=0, column=1, padx=(5, 0), sticky="w")
+        # TOP SECTION: Deck Loading (moved to gui_components.header_manager)
+        import gui_components.header_manager as headermgr
+        headermgr.create_top_section(self)
 
 
 
-        # MIDDLE SECTION: Card Counts
-        counts_frame = ctk.CTkFrame(self)
-        counts_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
-        # Create extra columns so we can center the inputs on wide screens
-        for i in range(9):
-            counts_frame.grid_columnconfigure(i, weight=0)
-        counts_frame.grid_columnconfigure(0, weight=1)
-        counts_frame.grid_columnconfigure(8, weight=1)
-
-        # Instructions (centered under title)
-        instr_label = ctk.CTkLabel(counts_frame,
-                        text="Specify card counts:",
-                        font=ctk.CTkFont(size=16, weight="bold"))
-        instr_label.grid(row=0, column=0, columnspan=9, pady=(10, 5))
-
-        desc_label = ctk.CTkLabel(counts_frame,
-                       text="Bricks = cards you don't want to draw  |  Non-Engine = handtraps & board breakers  |  Engine = combo pieces",
-                       font=ctk.CTkFont(size=12), text_color="gray")
-        desc_label.grid(row=1, column=0, columnspan=9, pady=(0, 10))
-
-        # Inputs row centered using inner columns 1..7
-        # Brick count
-        brick_label = ctk.CTkLabel(counts_frame, text="Bricks:", font=ctk.CTkFont(size=15))
-        brick_label.grid(row=2, column=1, padx=(10, 5), pady=10)
-
-        self.brick_entry = ctk.CTkEntry(counts_frame, width=80, placeholder_text="0",
-                        font=ctk.CTkFont(size=14))
-        self.brick_entry.grid(row=2, column=2, padx=5, pady=10)
-        self.brick_entry.insert(0, "0")
-
-        # Non-engine count
-        non_engine_label = ctk.CTkLabel(counts_frame, text="Non-Engine:", font=ctk.CTkFont(size=15))
-        non_engine_label.grid(row=2, column=3, padx=(10, 5), pady=10)
-
-        self.non_engine_entry = ctk.CTkEntry(counts_frame, width=80, placeholder_text="0",
-                             font=ctk.CTkFont(size=14))
-        self.non_engine_entry.grid(row=2, column=4, padx=5, pady=10)
-        self.non_engine_entry.insert(0, "0")
-
-        # Engine count
-        engine_label = ctk.CTkLabel(counts_frame, text="Engine:", font=ctk.CTkFont(size=15))
-        engine_label.grid(row=2, column=5, padx=(10, 5), pady=10)
-
-        self.engine_entry = ctk.CTkEntry(counts_frame, width=80, placeholder_text="0",
-                         font=ctk.CTkFont(size=14))
-        self.engine_entry.grid(row=2, column=6, padx=(5, 5), pady=10)
-        self.engine_entry.insert(0, "0")
-
-        # Apply button placed next to Engine input (column 7)
-        self.draw_btn = ctk.CTkButton(counts_frame, text="Apply & Draw Hand", width=165,
-                           command=self.apply_and_draw, state="disabled",
-                           font=ctk.CTkFont(size=14, weight="bold"),
-                           fg_color="green", hover_color="darkgreen")
-        self.draw_btn.grid(row=2, column=7, padx=(10, 20), pady=10)
-
-        # Deck info label (below, left-aligned within centered area)
-        self.deck_info_label = ctk.CTkLabel(counts_frame, text="No deck loaded",
-                     font=ctk.CTkFont(size=13), text_color="orange")
-        # Center the info label across the input area
-        self.deck_info_label.grid(row=3, column=0, columnspan=9, pady=(0, 8))
+        # MIDDLE SECTION: Card Counts (moved to gui_components.counts_manager)
+        import gui_components.counts_manager as countsmgr
+        countsmgr.create_counts_section(self)
 
         # BOTTOM SECTION: Results (use a horizontal PanedWindow so panels are resizable)
         # Theme background color for paned/window elements
@@ -456,121 +388,16 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.load_deck(ydke_code)
 
     def browse_file(self):
-        """Browse for a .ydk file"""
-        # Use {installed_path}\decklists
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        decklists_path = os.path.join(base_path, "decklists")
-        if not os.path.exists(decklists_path):
-            os.makedirs(decklists_path, exist_ok=True)
-        initial_dir = decklists_path
-
-        filepath = filedialog.askopenfilename(
-            title="Select YDK File",
-            initialdir=initial_dir,
-            filetypes=[("YDK files", "*.ydk"), ("All files", "*.*")]
-        )
-
-        if filepath:
-            self.file_path_label.configure(text=os.path.basename(filepath))
-            with open(filepath, 'r') as f:
-                ydk_content = f.read()
-            self.load_deck(ydk_content)
+        """Browse for a .ydk file (delegated to deck manager)"""
+        deckmgr.browse_file(self)
 
     def open_decklists_folder(self):
-        """Open the decklists folder in file explorer"""
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        decklists_path = os.path.join(base_path, "decklists")
-        if not os.path.exists(decklists_path):
-            os.makedirs(decklists_path, exist_ok=True)
-            messagebox.showinfo("Info", f"Created decklists folder at:\n{decklists_path}\n\nPlace your .ydk files here!")
-        os.startfile(decklists_path)
+        """Open the decklists folder in file explorer (delegated)"""
+        deckmgr.open_decklists_folder(self)
 
     def load_deck(self, ydk_code: str):
-        """Load deck from YDK file or ydke URL"""
-        self.deck.clear_deck()
-        ydk_code = ydk_code.strip()
-
-        try:
-            if ydk_code.startswith("ydke://"):
-                main_ids, _, _ = parse_ydke_url(ydk_code)
-                card_ids = main_ids
-                if not card_ids:
-                    messagebox.showerror("Error", "No main deck cards found in ydke code.")
-                    return
-            else:
-                # Parse YDK file format
-                card_ids = []
-                in_main_deck = False
-                for line in ydk_code.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    if line == "#main":
-                        in_main_deck = True
-                        continue
-                    elif line in ["#extra", "!side", "#side"]:
-                        in_main_deck = False
-                        continue
-                    elif line.startswith("#") or line.startswith("!"):
-                        continue
-                    if in_main_deck and line.isdigit():
-                        card_ids.append(line)
-
-                if not card_ids:
-                    messagebox.showerror("Error", "No main deck cards found.")
-                    return
-
-            # Fetch card names
-            self.deck_info_label.configure(text="Loading card names from API...", text_color="yellow")
-            self.update()
-
-            card_database = fetch_multiple_card_names(list(set(card_ids)), verbose=False)
-
-            # Count cards and map names to IDs
-            card_counts: Dict[str, int] = {}
-            for card_id in card_ids:
-                card_name = card_database.get(card_id, f"Card_{card_id}")
-                card_counts[card_name] = card_counts.get(card_name, 0) + 1
-                # Store the card_id for this card_name (for image lookup)
-                self.card_id_map[card_name] = card_id
-
-            # Add to deck
-            for card_name, copies in card_counts.items():
-                if copies > self.deck.MAX_COPIES:
-                    messagebox.showerror("Error", f"'{card_name}' has {copies} copies. Max is {self.deck.MAX_COPIES}.")
-                    self.deck.clear_deck()
-                    return
-                self.deck.add_card(card_name, copies)
-
-            self.deck_loaded = True
-            deck_size = self.deck.get_deck_size()
-            self.deck_info_label.configure(
-                text=f"✓ Deck loaded: {deck_size} cards",
-                text_color="lightgreen"
-            )
-            self.draw_btn.configure(state="normal")
-
-            # Show deck list in hand textbox
-            self.hand_textbox.configure(state="normal")
-            self.hand_textbox.delete("1.0", "end")
-            self.hand_textbox.insert("1.0", "DECK LIST\n" + "=" * 40 + "\n\n")
-            for card_name, copies in self.deck.cards.items():
-                # Show counts before the card name (e.g. "3x Fallen of the White Dragon")
-                self.hand_textbox.insert("end", f"{copies}x {card_name}\n")
-            self.hand_textbox.insert("end", "\n" + "=" * 40)
-            self.hand_textbox.insert("end", f"\nTotal: {deck_size} cards")
-            self.hand_textbox.insert("end", "\n\nSet card counts and click 'Apply & Draw Hand'")
-            self.hand_textbox.configure(state="disabled")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load deck:\n{str(e)}")
-            self.deck_info_label.configure(text="Failed to load deck", text_color="red")
+        """Load deck from YDK file or ydke URL (delegated)"""
+        deckmgr.load_deck(self, ydk_code)
 
     def apply_and_draw(self):
         """Apply card counts and draw a hand"""
@@ -733,200 +560,19 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.display_statistics()
 
     def load_and_display_image(self, url: str, parent_frame, card_name: str, is_sixth: bool = False, target_size: tuple = None):
-        """Load image from URL and display it"""
-        try:
-            # Determine target size
-            if target_size and isinstance(target_size, tuple) and len(target_size) == 2:
-                tw, th = target_size
-            else:
-                tw, th = (140, 205)
-
-            # Use cache key that includes size to avoid mismatched thumbnail sizes
-            cache_key = f"{url}|{tw}x{th}"
-
-            # Check if already cached for this size
-            if cache_key in self.image_cache:
-                img_tk = self.image_cache[cache_key]
-            else:
-                # Download image
-                req = urllib.request.Request(url)
-                req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    image_data = response.read()
-
-                # Open original PIL image and store it for future resizes
-                orig = Image.open(BytesIO(image_data)).convert("RGBA")
-                self.orig_images[url] = orig
-
-                # Resize from original to requested thumbnail
-                img = orig.resize((tw, th), Image.Resampling.LANCZOS)
-                img_tk = ImageTk.PhotoImage(img)
-                self.image_cache[cache_key] = img_tk
-
-            # Create label with image
-            label = ctk.CTkLabel(parent_frame, image=img_tk, text="")
-            label.image = img_tk  # Keep reference
-            # Tag label with source url for responsive resizing
-            try:
-                label._image_url = url
-            except Exception:
-                pass
-            label.grid(row=0, column=0)
-            # Add subtle border to image
-            try:
-                label.configure(border_width=1, border_color="#3a3a3a", corner_radius=6)
-            except Exception:
-                pass
-            self.card_image_labels.append(label)
-
-        except Exception as e:
-            # Fallback to text (smaller placeholder to match thumbnails)
-            try:
-                tw, th = (tw, th)
-            except Exception:
-                tw, th = (140, 205)
-            label = ctk.CTkLabel(parent_frame, text=card_name[:12], width=tw, height=th,
-                                 fg_color="gray30", corner_radius=5)
-            label.grid(row=0, column=0)
+        # Delegated to the image manager module to reduce file size
+        imgmgr.load_and_display_image(self, url, parent_frame, card_name, is_sixth=is_sixth, target_size=target_size)
 
     def draw_again(self):
         """Draw another hand"""
         self.draw_hand()
 
     def _resize_thumbnails(self, canvas_height: int):
-        """Resize all displayed thumbnails to fit the given canvas height while keeping padding."""
-        # Determine thumbnail height (same clamp as when drawing)
-        try:
-            thumb_h = max(100, min(205, canvas_height - 30))
-            thumb_w = int(thumb_h * (140 / 205))
-        except Exception:
-            thumb_w, thumb_h = 140, 205
-
-        # Resize each labeled image if we have the original
-        for lbl in list(self.card_image_labels):
-            url = getattr(lbl, '_image_url', None)
-            if not url:
-                continue
-            # Use size-specific cache key
-            cache_key = f"{url}|{thumb_w}x{thumb_h}"
-            try:
-                if cache_key in self.image_cache:
-                    img_tk = self.image_cache[cache_key]
-                else:
-                    orig = self.orig_images.get(url)
-                    if orig is None:
-                        # no original image; skip
-                        continue
-                    img = orig.resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
-                    img_tk = ImageTk.PhotoImage(img)
-                    self.image_cache[cache_key] = img_tk
-
-                # Update label image
-                lbl.configure(image=img_tk)
-                lbl.image = img_tk
-            except Exception:
-                continue
+        # Delegated to the image manager module to reduce file size
+        imgmgr.resize_thumbnails(self, canvas_height)
 
     def display_statistics(self):
-        """Calculate and display probability statistics"""
-        deck_size = self.deck.get_deck_size()
-        engine_count = sum(self.deck.cards[c] for c in self.deck.engine_cards)
-        non_engine_count = sum(self.deck.cards[c] for c in self.deck.non_engine_cards)
-        brick_count = sum(self.deck.cards[c] for c in self.deck.brick_cards)
-        hand_size = 5
-
-        self.stats_textbox.configure(state="normal")
-        self.stats_textbox.delete("1.0", "end")
-
-        # Header
-        self.stats_textbox.insert("end", "OPENING HAND PROBABILITIES\n")
-        self.stats_textbox.insert("end", "=" * 50 + "\n\n")
-
-        # Deck composition
-        self.stats_textbox.insert("end", f"Deck: {deck_size} cards\n")
-        self.stats_textbox.insert("end", f"  Engine: {engine_count} | Non-Engine: {non_engine_count} | Bricks: {brick_count}\n\n")
-
-        # Engine x Non-Engine Matrix
-        self.stats_textbox.insert("end", "Engine x Non-Engine Matrix:\n")
-        self.stats_textbox.insert("end", "(E = Engine, NE = Non-Engine/Handtraps)\n\n")
-
-        # Header row
-        self.stats_textbox.insert("end", "       ")
-        for ne in range(6):
-            self.stats_textbox.insert("end", f" {ne}NE   ")
-        self.stats_textbox.insert("end", "\n")
-
-        # Matrix rows
-        for eng in range(6):
-            self.stats_textbox.insert("end", f"  {eng}E  ")
-            for ne in range(6):
-                if eng + ne <= 5:
-                    if eng <= engine_count and ne <= non_engine_count:
-                        other_count = deck_size - engine_count - non_engine_count
-                        other_in_hand = hand_size - eng - ne
-                        if other_in_hand >= 0 and other_in_hand <= other_count:
-                            prob = (comb(engine_count, eng) *
-                                   comb(non_engine_count, ne) *
-                                   comb(other_count, other_in_hand)) / comb(deck_size, hand_size)
-                            prob *= 100
-                            if prob > 0:
-                                self.stats_textbox.insert("end", f"{prob:5.1f}% ")
-                            else:
-                                self.stats_textbox.insert("end", "   -  ")
-                        else:
-                            self.stats_textbox.insert("end", "   -  ")
-                    else:
-                        self.stats_textbox.insert("end", "   -  ")
-                else:
-                    self.stats_textbox.insert("end", "   -  ")
-            self.stats_textbox.insert("end", "\n")
-
-        # At Least Probabilities
-        self.stats_textbox.insert("end", "\n" + "-" * 50 + "\n")
-        self.stats_textbox.insert("end", "'At Least' Probabilities:\n")
-        self.stats_textbox.insert("end", "(Chance of drawing X OR MORE)\n\n")
-
-        for i in [1, 2]:
-            eng_prob = probability_at_least(deck_size, engine_count, hand_size, i) * 100
-            self.stats_textbox.insert("end", f"  At least {i} engine:      {eng_prob:5.1f}%\n")
-        for i in [1, 2]:
-            ne_prob = probability_at_least(deck_size, non_engine_count, hand_size, i) * 100
-            self.stats_textbox.insert("end", f"  At least {i} non-engine:  {ne_prob:5.1f}%\n")
-        for i in [1, 2]:
-            br_prob = probability_at_least(deck_size, brick_count, hand_size, i) * 100
-            self.stats_textbox.insert("end", f"  At least {i} brick:       {br_prob:5.1f}%\n")
-
-        # Brick Analysis
-        self.stats_textbox.insert("end", "\n" + "-" * 50 + "\n")
-        self.stats_textbox.insert("end", "BRICK ANALYSIS\n\n")
-
-        open_brick = probability_at_least(deck_size, brick_count, hand_size, 1) * 100
-        no_brick_open = hypergeometric_probability(deck_size, brick_count, hand_size, 0)
-        draw_brick_6th = (brick_count / (deck_size - 5)) * 100 if deck_size > 5 else 0
-        brick_by_turn1 = open_brick + (no_brick_open * brick_count / (deck_size - 5) * 100) if deck_size > 5 else open_brick
-
-        self.stats_textbox.insert("end", f"  Open with brick (5 cards):     {open_brick:5.1f}%\n")
-        self.stats_textbox.insert("end", f"  Draw brick 6th (if none open): {draw_brick_6th:5.1f}%\n")
-        self.stats_textbox.insert("end", f"  See brick by turn 1 (6 cards): {brick_by_turn1:5.1f}%\n")
-
-        # 6th Card Odds
-        self.stats_textbox.insert("end", "\n" + "-" * 50 + "\n")
-        self.stats_textbox.insert("end", "6TH CARD ODDS (based on current hand)\n\n")
-
-        remaining_deck = deck_size - 5
-        engine_in_hand = sum(1 for c in self.current_hand if c in self.deck.engine_cards)
-        non_engine_in_hand = sum(1 for c in self.current_hand if c in self.deck.non_engine_cards)
-        brick_in_hand = sum(1 for c in self.current_hand if c in self.deck.brick_cards)
-
-        engine_remaining = engine_count - engine_in_hand
-        non_engine_remaining = non_engine_count - non_engine_in_hand
-        brick_remaining = brick_count - brick_in_hand
-
-        self.stats_textbox.insert("end", f"  Engine:      {engine_remaining/remaining_deck*100:5.1f}% ({engine_remaining}/{remaining_deck})\n")
-        self.stats_textbox.insert("end", f"  Non-Engine:  {non_engine_remaining/remaining_deck*100:5.1f}% ({non_engine_remaining}/{remaining_deck})\n")
-        self.stats_textbox.insert("end", f"  Brick:       {brick_remaining/remaining_deck*100:5.1f}% ({brick_remaining}/{remaining_deck})\n")
-
-        self.stats_textbox.configure(state="disabled")
+        statsmgr.display_statistics(self)
 
 
 def main():
