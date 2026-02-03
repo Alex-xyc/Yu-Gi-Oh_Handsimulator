@@ -36,7 +36,5 @@ If you'd like to contribute, please open an issue or a pull request and include 
 
 Contact
 For questions about ownership or licensing, contact the repository owner.
-**Yu-Gi-Oh Hand simulator!**
 
-This program allows you upload YDK code and YDK files to test your deck hands and see a calculation of your odds opening specific types of cards!
 
