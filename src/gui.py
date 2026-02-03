@@ -109,7 +109,8 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.deck_loaded = False
         self.current_hand = []
         self.card_id_map: Dict[str, str] = {}  # card_name -> card_id
-        self.image_cache: Dict[str, ImageTk.PhotoImage] = {}  # Cache loaded images
+        self.image_cache: Dict[str, ImageTk.PhotoImage] = {}  # Cache loaded images (keyed by url|WxH)
+        self.orig_images: Dict[str, 'Image.Image'] = {}  # Store original PIL images by URL
         self.card_image_labels = []  # Store image label references
 
         # Create UI
@@ -245,27 +246,34 @@ class YuGiOhHandSimulator(ctk.CTk):
         container.grid_columnconfigure(1, weight=0, minsize=8)
         container.grid_columnconfigure(2, weight=1)
 
-        # Left panel - Hand display
+
+        # Left panel - Hand display (responsive)
         hand_frame = ctk.CTkFrame(container, fg_color="#2b2b2b", corner_radius=12,
                       border_width=1, border_color="#3a3a3a")
         hand_frame.grid(row=0, column=0, sticky="nsew", padx=(6, 2), pady=6)
-        hand_frame.grid_rowconfigure(1, weight=0)
-        hand_frame.grid_rowconfigure(2, weight=1)
+        hand_frame.grid_rowconfigure(1, weight=1)  # Card images area expands
+        hand_frame.grid_rowconfigure(2, weight=0)  # Horizontal scrollbar (fixed size)
+        hand_frame.grid_rowconfigure(3, weight=2)  # Text area expands more
         hand_frame.grid_columnconfigure(0, weight=1)
 
-        hand_title = ctk.CTkLabel(hand_frame, text="Test Hand",
-                   font=ctk.CTkFont(size=16, weight="bold"), anchor="center", justify="center")
-        hand_title.grid(row=0, column=0, pady=(10, 5), sticky='ew')
+        # Header with title and compact Draw button
+        header_frame = ctk.CTkFrame(hand_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, pady=(8, 4), padx=10, sticky='ew')
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_columnconfigure(1, weight=0)
+
+        hand_title = ctk.CTkLabel(header_frame, text="Test Hand",
+               font=ctk.CTkFont(size=16, weight="bold"), anchor="center", justify="center")
+        hand_title.grid(row=0, column=0, sticky='ew')
+
+        # (Draw Again button removed — uses Apply & Draw Hand instead)
 
 
-        # Card images frame with horizontal scrollbar using Canvas
-        card_canvas = tk.Canvas(hand_frame, bg="#2b2b2b", highlightthickness=0, height=180)
-        card_canvas.grid(row=1, column=0, padx=10, pady=6, sticky="ew")
-        h_scroll = tk.Scrollbar(hand_frame, orient="horizontal", command=card_canvas.xview)
-        h_scroll.grid(row=2, column=0, sticky="ew", padx=10)
-        card_canvas.configure(xscrollcommand=h_scroll.set)
+        # Card images frame with horizontal scrollbar using Canvas (responsive)
+        card_canvas = tk.Canvas(hand_frame, bg="#23272b", highlightthickness=0, bd=0, relief="flat")
+        card_canvas.grid(row=1, column=0, padx=10, pady=(6, 0), sticky="nsew")
         # Frame inside the canvas for card images
-        self.cards_frame = tk.Frame(card_canvas, bg="#2b2b2b")
+        self.cards_frame = tk.Frame(card_canvas, bg="#23272b")
         self.cards_frame_id = card_canvas.create_window((0, 0), window=self.cards_frame, anchor="nw")
 
         def _on_frame_configure(event):
@@ -273,18 +281,84 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.cards_frame.bind("<Configure>", _on_frame_configure)
 
         def _on_canvas_configure(event):
-            # Make the canvas width fill the available space
-            canvas_width = event.width
-            card_canvas.itemconfig(self.cards_frame_id, width=canvas_width)
+            # Make the canvas height fill the available space
+            canvas_height = event.height
+            card_canvas.itemconfig(self.cards_frame_id, height=canvas_height)
+            # Update thumbnails to match new canvas height so they scale responsively
+            try:
+                self._resize_thumbnails(canvas_height)
+            except Exception:
+                pass
         card_canvas.bind("<Configure>", _on_canvas_configure)
 
-        # Text display for card names (below images) - larger for readability
-        # Let the textbox size naturally and expand; remove fixed height constraints
-        self.hand_textbox = ctk.CTkTextbox(hand_frame, font=ctk.CTkFont(size=14), width=560)
-        self.hand_textbox.grid(row=2, column=0, padx=10, pady=(6, 10), sticky="nsew")
+        # Horizontal scrollbar between images and text (styled to match CTk theme)
+        try:
+            h_scroll = ctk.CTkScrollbar(hand_frame, orientation="horizontal", command=card_canvas.xview)
+            h_scroll.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 0))
+            # Ensure the scrollbar background/trough matches the card canvas so it isn't white
+            try:
+                # preferred CTk styling
+                h_scroll.configure(fg_color="#23272b")
+                h_scroll.configure(border_color="#23272b")
+                h_scroll.configure(corner_radius=6)
+            except Exception:
+                # best-effort: set underlying tk widget colors if available
+                try:
+                    h_scroll.configure(bg="#23272b")
+                except Exception:
+                    pass
+            card_canvas.configure(xscrollcommand=h_scroll.set)
+        except Exception:
+            # Fallback to native Tk scrollbar if CTkScrollbar is unavailable
+            h_scroll = tk.Scrollbar(hand_frame, orient="horizontal", command=card_canvas.xview)
+            h_scroll.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 0))
+            try:
+                h_scroll.configure(bg="#23272b", troughcolor="#23272b", activebackground="#23272b")
+            except Exception:
+                pass
+            card_canvas.configure(xscrollcommand=h_scroll.set)
+
+        # Text display for card names (responsive, with vertical scrollbar, styled for dark theme)
+        text_frame = tk.Frame(hand_frame, bg="#181a1b")
+        text_frame.grid(row=3, column=0, padx=10, pady=(6, 10), sticky="nsew")
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        self.hand_textbox = tk.Text(
+            text_frame,
+            font=("Consolas", 10),
+            wrap="word",
+            bg="#181a1b",
+            fg="#c7c7c7",
+            insertbackground="#c7c7c7",
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            selectbackground="#2b2b2b",
+            selectforeground="#ffffff",
+            padx=8,
+            pady=6,
+        )
+        self.hand_textbox.grid(row=0, column=0, sticky="nsew")
+        try:
+            y_scroll = ctk.CTkScrollbar(text_frame, orientation="vertical", command=self.hand_textbox.yview)
+            y_scroll.grid(row=0, column=1, sticky="ns")
+            try:
+                y_scroll.configure(fg_color="#23272b", border_color="#23272b", corner_radius=6)
+            except Exception:
+                try:
+                    y_scroll.configure(bg="#23272b")
+                except Exception:
+                    pass
+        except Exception:
+            y_scroll = tk.Scrollbar(text_frame, orient="vertical", command=self.hand_textbox.yview)
+            y_scroll.grid(row=0, column=1, sticky="ns")
+            try:
+                y_scroll.configure(bg="#23272b", troughcolor="#23272b", activebackground="#23272b")
+            except Exception:
+                pass
+        self.hand_textbox.configure(yscrollcommand=y_scroll.set)
         self.hand_textbox.insert("1.0", "Load a deck and click 'Apply & Draw Hand' to begin...")
         self.hand_textbox.configure(state="disabled")
-        hand_frame.grid_rowconfigure(2, weight=1)
 
         # Draw again button moved to persistent footer (created below)
 
@@ -300,18 +374,7 @@ class YuGiOhHandSimulator(ctk.CTk):
         stats_frame.grid_rowconfigure(0, weight=0)
         stats_frame.grid_rowconfigure(1, weight=1)
 
-        # FOOTER: persistent area for actions so it doesn't reflow during panel resizing
-        footer = ctk.CTkFrame(self, fg_color=self.bg_color)
-        # reduce vertical gap between hand area and footer; keep small outer padding
-        footer.grid(row=3, column=0, columnspan=2, sticky='ew', padx=10, pady=(2, 8))
-        footer.grid_columnconfigure(0, weight=1)
-        # larger button for easier tapping; stable placement so it doesn't reflow
-        self.draw_again_btn = ctk.CTkButton(footer, text="Draw Again", width=210, height=42,
-                            command=self.draw_again, state="disabled",
-                            fg_color="#1976d2", hover_color="#165fb0",
-                            font=ctk.CTkFont(size=14, weight="bold"))
-        # small vertical padding to keep tight spacing
-        self.draw_again_btn.grid(row=0, column=0, pady=4)
+        # Leave no persistent footer so the panels extend to the bottom of the window
         stats_frame.grid_columnconfigure(0, weight=1)
 
         stats_title = ctk.CTkLabel(stats_frame, text="Probabilities & Statistics",
@@ -571,7 +634,7 @@ class YuGiOhHandSimulator(ctk.CTk):
                 self.deck.engine_cards.add(card_name)
             remaining -= copies
 
-        self.draw_again_btn.configure(state="normal")
+        # draw_again button removed; rely on the main Apply & Draw Hand button
         self.draw_hand()
 
     def draw_hand(self):
@@ -593,15 +656,25 @@ class YuGiOhHandSimulator(ctk.CTk):
                 card_id = self.card_id_map.get(card, '')
                 image_url = image_cache.get(card_id, '')
 
-                # Create frame for each card (bigger padding for larger thumbnails)
+                # Create frame for each card (padding around thumbnail)
                 card_frame = ctk.CTkFrame(self.cards_frame, fg_color=self.bg_color, corner_radius=6)
                 card_frame.grid(row=0, column=i, padx=8, pady=6)
 
+                # Compute responsive thumbnail size based on canvas height
+                try:
+                    canvas = self.cards_frame.master  # the Canvas containing cards_frame
+                    canvas_h = canvas.winfo_height() or 205
+                    # leave some padding; clamp between 100 and 205
+                    thumb_h = max(100, min(205, canvas_h - 30))
+                    thumb_w = int(thumb_h * (140 / 205))
+                except Exception:
+                    thumb_w, thumb_h = 140, 205
+
                 if image_url:
-                    self.load_and_display_image(image_url, card_frame, card)
+                    self.load_and_display_image(image_url, card_frame, card, target_size=(thumb_w, thumb_h))
                 else:
-                    # Fallback to text label (larger placeholder)
-                    label = ctk.CTkLabel(card_frame, text=card[:15], width=168, height=246,
+                    # Fallback to text label sized to match thumbnails
+                    label = ctk.CTkLabel(card_frame, text=card[:15], width=thumb_w, height=thumb_h,
                                          fg_color="gray30", corner_radius=5)
                     label.grid(row=0, column=0)
 
@@ -628,10 +701,18 @@ class YuGiOhHandSimulator(ctk.CTk):
                 card_frame = ctk.CTkFrame(self.cards_frame, fg_color="transparent")
                 card_frame.grid(row=0, column=6, padx=6, pady=4)
 
+                try:
+                    canvas = self.cards_frame.master
+                    canvas_h = canvas.winfo_height() or 205
+                    thumb_h = max(100, min(205, canvas_h - 30))
+                    thumb_w = int(thumb_h * (140 / 205))
+                except Exception:
+                    thumb_w, thumb_h = 140, 205
+
                 if image_url:
-                    self.load_and_display_image(image_url, card_frame, sixth_card, is_sixth=True)
+                    self.load_and_display_image(image_url, card_frame, sixth_card, is_sixth=True, target_size=(thumb_w, thumb_h))
                 else:
-                    label = ctk.CTkLabel(card_frame, text=sixth_card[:15], width=168, height=246,
+                    label = ctk.CTkLabel(card_frame, text=sixth_card[:15], width=thumb_w, height=thumb_h,
                                          fg_color="gray30", corner_radius=5)
                     label.grid(row=0, column=0)
 
@@ -651,12 +732,21 @@ class YuGiOhHandSimulator(ctk.CTk):
         # Calculate and display statistics
         self.display_statistics()
 
-    def load_and_display_image(self, url: str, parent_frame, card_name: str, is_sixth: bool = False):
+    def load_and_display_image(self, url: str, parent_frame, card_name: str, is_sixth: bool = False, target_size: tuple = None):
         """Load image from URL and display it"""
         try:
-            # Check if already cached
-            if url in self.image_cache:
-                img_tk = self.image_cache[url]
+            # Determine target size
+            if target_size and isinstance(target_size, tuple) and len(target_size) == 2:
+                tw, th = target_size
+            else:
+                tw, th = (140, 205)
+
+            # Use cache key that includes size to avoid mismatched thumbnail sizes
+            cache_key = f"{url}|{tw}x{th}"
+
+            # Check if already cached for this size
+            if cache_key in self.image_cache:
+                img_tk = self.image_cache[cache_key]
             else:
                 # Download image
                 req = urllib.request.Request(url)
@@ -664,16 +754,23 @@ class YuGiOhHandSimulator(ctk.CTk):
                 with urllib.request.urlopen(req, timeout=10) as response:
                     image_data = response.read()
 
-                # Open and resize image
-                img = Image.open(BytesIO(image_data))
-                # Small images are 168x246; show them at native small-thumb size
-                img = img.resize((168, 246), Image.Resampling.LANCZOS)
+                # Open original PIL image and store it for future resizes
+                orig = Image.open(BytesIO(image_data)).convert("RGBA")
+                self.orig_images[url] = orig
+
+                # Resize from original to requested thumbnail
+                img = orig.resize((tw, th), Image.Resampling.LANCZOS)
                 img_tk = ImageTk.PhotoImage(img)
-                self.image_cache[url] = img_tk
+                self.image_cache[cache_key] = img_tk
 
             # Create label with image
             label = ctk.CTkLabel(parent_frame, image=img_tk, text="")
             label.image = img_tk  # Keep reference
+            # Tag label with source url for responsive resizing
+            try:
+                label._image_url = url
+            except Exception:
+                pass
             label.grid(row=0, column=0)
             # Add subtle border to image
             try:
@@ -683,14 +780,52 @@ class YuGiOhHandSimulator(ctk.CTk):
             self.card_image_labels.append(label)
 
         except Exception as e:
-            # Fallback to text (larger placeholder)
-            label = ctk.CTkLabel(parent_frame, text=card_name[:12], width=168, height=246,
+            # Fallback to text (smaller placeholder to match thumbnails)
+            try:
+                tw, th = (tw, th)
+            except Exception:
+                tw, th = (140, 205)
+            label = ctk.CTkLabel(parent_frame, text=card_name[:12], width=tw, height=th,
                                  fg_color="gray30", corner_radius=5)
             label.grid(row=0, column=0)
 
     def draw_again(self):
         """Draw another hand"""
         self.draw_hand()
+
+    def _resize_thumbnails(self, canvas_height: int):
+        """Resize all displayed thumbnails to fit the given canvas height while keeping padding."""
+        # Determine thumbnail height (same clamp as when drawing)
+        try:
+            thumb_h = max(100, min(205, canvas_height - 30))
+            thumb_w = int(thumb_h * (140 / 205))
+        except Exception:
+            thumb_w, thumb_h = 140, 205
+
+        # Resize each labeled image if we have the original
+        for lbl in list(self.card_image_labels):
+            url = getattr(lbl, '_image_url', None)
+            if not url:
+                continue
+            # Use size-specific cache key
+            cache_key = f"{url}|{thumb_w}x{thumb_h}"
+            try:
+                if cache_key in self.image_cache:
+                    img_tk = self.image_cache[cache_key]
+                else:
+                    orig = self.orig_images.get(url)
+                    if orig is None:
+                        # no original image; skip
+                        continue
+                    img = orig.resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+                    img_tk = ImageTk.PhotoImage(img)
+                    self.image_cache[cache_key] = img_tk
+
+                # Update label image
+                lbl.configure(image=img_tk)
+                lbl.image = img_tk
+            except Exception:
+                continue
 
     def display_statistics(self):
         """Calculate and display probability statistics"""
