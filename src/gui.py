@@ -61,12 +61,15 @@ class YuGiOhHandSimulator(ctk.CTk):
         # Load app icon from `icons/` folder (prefer .ico on Windows,
         # also set an iconphoto so the taskbar uses the same image)
         try:
-            # Prefer the .ico file but accept a fallback name if the user supplied
-            # a differently named file (some users provided 'ghattic.ic').
-            script_dir = os.path.dirname(__file__)
-            icon_path = os.path.join(script_dir, "icons", "ghattic.ico")
+            # Handle PyInstaller _MEIPASS for bundled .exe
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(__file__)
+
+            icon_path = os.path.join(base_path, "icons", "ghattic.ico")
             if not os.path.exists(icon_path):
-                alt_path = os.path.join(script_dir, "icons", "ghattic.ic")
+                alt_path = os.path.join(base_path, "icons", "ghattic.ic")
                 if os.path.exists(alt_path):
                     icon_path = alt_path
 
@@ -254,10 +257,26 @@ class YuGiOhHandSimulator(ctk.CTk):
                    font=ctk.CTkFont(size=16, weight="bold"), anchor="center", justify="center")
         hand_title.grid(row=0, column=0, pady=(10, 5), sticky='ew')
 
-        # Card images frame (horizontal area for larger thumbnails)
-        # Match the hand frame bg so there is no visual bleed into the button area
-        self.cards_frame = ctk.CTkFrame(hand_frame, fg_color="#2b2b2b")
-        self.cards_frame.grid(row=1, column=0, padx=10, pady=6, sticky="ew")
+
+        # Card images frame with horizontal scrollbar using Canvas
+        card_canvas = tk.Canvas(hand_frame, bg="#2b2b2b", highlightthickness=0, height=180)
+        card_canvas.grid(row=1, column=0, padx=10, pady=6, sticky="ew")
+        h_scroll = tk.Scrollbar(hand_frame, orient="horizontal", command=card_canvas.xview)
+        h_scroll.grid(row=2, column=0, sticky="ew", padx=10)
+        card_canvas.configure(xscrollcommand=h_scroll.set)
+        # Frame inside the canvas for card images
+        self.cards_frame = tk.Frame(card_canvas, bg="#2b2b2b")
+        self.cards_frame_id = card_canvas.create_window((0, 0), window=self.cards_frame, anchor="nw")
+
+        def _on_frame_configure(event):
+            card_canvas.configure(scrollregion=card_canvas.bbox("all"))
+        self.cards_frame.bind("<Configure>", _on_frame_configure)
+
+        def _on_canvas_configure(event):
+            # Make the canvas width fill the available space
+            canvas_width = event.width
+            card_canvas.itemconfig(self.cards_frame_id, width=canvas_width)
+        card_canvas.bind("<Configure>", _on_canvas_configure)
 
         # Text display for card names (below images) - larger for readability
         # Let the textbox size naturally and expand; remove fixed height constraints
@@ -375,11 +394,15 @@ class YuGiOhHandSimulator(ctk.CTk):
 
     def browse_file(self):
         """Browse for a .ydk file"""
-        # Start in decklists folder if it exists
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        decklists_path = os.path.join(script_dir, 'decklists')
-
-        initial_dir = decklists_path if os.path.exists(decklists_path) else script_dir
+        # Use {installed_path}\decklists
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        decklists_path = os.path.join(base_path, "decklists")
+        if not os.path.exists(decklists_path):
+            os.makedirs(decklists_path, exist_ok=True)
+        initial_dir = decklists_path
 
         filepath = filedialog.askopenfilename(
             title="Select YDK File",
@@ -395,13 +418,14 @@ class YuGiOhHandSimulator(ctk.CTk):
 
     def open_decklists_folder(self):
         """Open the decklists folder in file explorer"""
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        decklists_path = os.path.join(script_dir, 'decklists')
-
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        decklists_path = os.path.join(base_path, "decklists")
         if not os.path.exists(decklists_path):
             os.makedirs(decklists_path, exist_ok=True)
             messagebox.showinfo("Info", f"Created decklists folder at:\n{decklists_path}\n\nPlace your .ydk files here!")
-
         os.startfile(decklists_path)
 
     def load_deck(self, ydk_code: str):
