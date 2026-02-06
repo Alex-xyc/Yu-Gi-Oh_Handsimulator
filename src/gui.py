@@ -58,6 +58,7 @@ except ImportError:
     PIL_AVAILABLE = False
 
 
+
 from main import (
     YuGiOhDeck,
     fetch_multiple_card_names,
@@ -68,9 +69,26 @@ from main import (
     get_image_cache
 )
 
+# Import KDE PDF export
+from functions.KDE_Export import fill_kde_decklist_pdf
+
 
 
 class YuGiOhHandSimulator(ctk.CTk):
+
+        def export_deck_pdf(self):
+            """Export the current deck to official KDE PDF and open preview."""
+            if not self.deck_loaded or not self.deck.cards:
+                messagebox.showwarning("No Deck Loaded", "Please load a deck before exporting.")
+                return
+            try:
+                deck_name = "My Deck"
+                if hasattr(self, 'deck_name') and self.deck_name:
+                    deck_name = self.deck_name
+                fill_kde_decklist_pdf(self.deck, deck_name=deck_name)
+                messagebox.showinfo("Export Complete", "Deck exported to KDE PDF and opened in your browser.")
+            except Exception as e:
+                messagebox.showerror("Export Failed", f"Could not export deck: {e}")
     """Yu-Gi-Oh Hand Simulator GUI Application"""
 
     def __init__(self):

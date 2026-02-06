@@ -47,12 +47,26 @@ def create_counts_section(app):
     app.engine_entry.grid(row=2, column=6, padx=(5, 5), pady=10)
     app.engine_entry.insert(0, "0")
 
+
     # Apply button
     app.draw_btn = ctk.CTkButton(counts_frame, text="Apply & Draw Hand", width=165,
                        command=app.apply_and_draw, state="disabled",
                        font=ctk.CTkFont(size=14, weight="bold"),
                        fg_color="green", hover_color="darkgreen")
-    app.draw_btn.grid(row=2, column=7, padx=(10, 20), pady=10)
+    app.draw_btn.grid(row=2, column=7, padx=(10, 5), pady=10)
+
+    # Export KDE PDF button (far right, blue)
+    app.export_pdf_btn = ctk.CTkButton(
+        counts_frame,
+        text="Export KDE PDF",
+        width=150,
+        command=app.export_deck_pdf,
+        font=ctk.CTkFont(size=14, weight="bold"),
+        fg_color="#1976d2",  # Blue
+        hover_color="#1565c0",
+        text_color="white"
+    )
+    app.export_pdf_btn.grid(row=2, column=8, padx=(5, 10), pady=10, sticky="e")
 
     # Deck info label
     app.deck_info_label = ctk.CTkLabel(counts_frame, text="No deck loaded",

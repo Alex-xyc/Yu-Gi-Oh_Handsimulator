@@ -1,1 +1,4 @@
+pdfrw
+# For PDF export
+fpdf
 pylint
