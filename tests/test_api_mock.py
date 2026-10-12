@@ -10,9 +10,28 @@ SRC_PATH = os.path.join(ROOT, 'src')
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
+import tempfile
+
+import card_cache
 import main
 
 class TestAPIMock(unittest.TestCase):
+    def setUp(self):
+        # Use an empty cache so the tests exercise the (mocked) API, not files on disk
+        self._tmp = tempfile.TemporaryDirectory()
+        self._env = patch.dict(os.environ, {'YGO_CACHE_DIR': self._tmp.name})
+        self._env.start()
+        card_cache._db = None
+        card_cache._edopro = None
+        main._card_name_cache.clear()
+        main._card_image_cache.clear()
+
+    def tearDown(self):
+        self._env.stop()
+        self._tmp.cleanup()
+        card_cache._db = None
+        card_cache._edopro = None
+
     def test_fetch_multiple_card_names_batch(self):
         # Prepare fake API response
         fake_data = {

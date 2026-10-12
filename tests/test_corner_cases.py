@@ -47,9 +47,7 @@ class TestCornerCases(unittest.TestCase):
         for i in range(35):
             deck.add_card(f'B{i}', 1)
         # mark categories
-        deck.engine_cards.update({'E1', 'E2', 'E3'})
-        deck.non_engine_cards.update({'N1', 'N2'})
-        deck.brick_cards.update({f'B{i}' for i in range(35)})
+        deck.assign_categories(brick_count=35, non_engine_count=2, engine_count=3)
 
         probs = main.calculate_probabilities(deck, hand_size=5)
         # engine_probs keys 0..5 should sum to ~1
@@ -72,6 +70,20 @@ class TestCornerCases(unittest.TestCase):
         deck.add_card('Z', 3)
         lst = deck.get_deck_list()
         self.assertEqual(lst.count('Z'), 3)
+
+    def test_assign_categories_exact_counts(self):
+        # Regression: 4 bricks with 3-ofs first used to come out as 3
+        deck = main.YuGiOhDeck()
+        deck.add_card('A', 3)
+        deck.add_card('B', 3)
+        deck.add_card('C', 1)
+        deck.add_card('D', 3)
+        deck.assign_categories(brick_count=4, non_engine_count=3, engine_count=3)
+        probs = main.calculate_probabilities(deck, hand_size=5)
+        self.assertEqual(probs['brick_total'], 4)
+        self.assertEqual(probs['non_engine_total'], 3)
+        self.assertEqual(probs['engine_total'], 3)
+        self.assertEqual(sum(deck.cards[c] for c in deck.brick_cards), 4)
 
 if __name__ == '__main__':
     unittest.main()

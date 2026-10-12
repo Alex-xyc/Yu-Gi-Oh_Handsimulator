@@ -4,7 +4,19 @@ Functions operate on the `app` instance and replace the methods
 `apply_and_draw`, `draw_hand`, and `draw_again` from `gui.py`.
 """
 import random
+import customtkinter as ctk
 from main import get_image_cache
+
+
+def _make_card_frame(app):
+    """Frame that holds one card thumbnail in the cards row."""
+    return ctk.CTkFrame(app.cards_frame, fg_color=getattr(app, 'bg_color', '#242424'), corner_radius=6)
+
+
+def _make_sep_label(app):
+    """Label separating the opening hand from the 6th card."""
+    return ctk.CTkLabel(app.cards_frame, text="+ 6th", text_color="gray",
+                        font=ctk.CTkFont(size=13, weight="bold"))
 
 
 def apply_and_draw(app):
@@ -47,42 +59,7 @@ def apply_and_draw(app):
             pass
         return
 
-    # Assign categories
-    card_list = list(app.deck.cards.keys())
-    app.deck.engine_cards.clear()
-    app.deck.non_engine_cards.clear()
-    app.deck.brick_cards.clear()
-
-    remaining = brick_count
-    for card_name in card_list:
-        if remaining <= 0:
-            break
-        copies = app.deck.cards[card_name]
-        if copies <= remaining:
-            app.deck.brick_cards.add(card_name)
-        remaining -= copies
-
-    remaining = non_engine_count
-    for card_name in card_list:
-        if remaining <= 0:
-            break
-        if card_name in app.deck.brick_cards:
-            continue
-        copies = app.deck.cards[card_name]
-        if copies <= remaining:
-            app.deck.non_engine_cards.add(card_name)
-        remaining -= copies
-
-    remaining = engine_count
-    for card_name in card_list:
-        if remaining <= 0:
-            break
-        if card_name in app.deck.brick_cards or card_name in app.deck.non_engine_cards:
-            continue
-        copies = app.deck.cards[card_name]
-        if copies <= remaining:
-            app.deck.engine_cards.add(card_name)
-        remaining -= copies
+    app.deck.assign_categories(brick_count, non_engine_count, engine_count)
 
     # draw_again button removed; rely on the main Apply & Draw Hand button
     draw_hand(app)
@@ -113,11 +90,7 @@ def draw_hand(app):
             image_url = image_cache.get(card_id, '')
 
             # Create frame for each card (padding around thumbnail)
-            try:
-                card_frame = app.card_frame_factory(app.cards_frame)
-            except Exception:
-                import customtkinter as ctk
-                card_frame = ctk.CTkFrame(app.cards_frame, fg_color=app.bg_color, corner_radius=6)
+            card_frame = _make_card_frame(app)
             try:
                 card_frame.grid(row=0, column=i, padx=8, pady=6)
             except Exception:
@@ -142,7 +115,6 @@ def draw_hand(app):
                         pass
             else:
                 try:
-                    import customtkinter as ctk
                     label = ctk.CTkLabel(card_frame, text=card[:15], width=thumb_w, height=thumb_h,
                                          fg_color="gray30", corner_radius=5)
                     label.grid(row=0, column=0)
@@ -172,17 +144,11 @@ def draw_hand(app):
         card_id = app.card_id_map.get(sixth_card, '')
         image_url = image_cache.get(card_id, '')
 
-        try:
-            sep_label = app.sep_label_factory(app.cards_frame)
-            sep_label.grid(row=0, column=5, padx=10)
-        except Exception:
-            pass
+        sep_label = _make_sep_label(app)
+        sep_label.grid(row=0, column=5, padx=10)
 
-        try:
-            card_frame = app.card_frame_factory(app.cards_frame)
-            card_frame.grid(row=0, column=6, padx=6, pady=4)
-        except Exception:
-            pass
+        card_frame = _make_card_frame(app)
+        card_frame.grid(row=0, column=6, padx=8, pady=6)
 
         try:
             canvas = app.cards_frame.master
@@ -202,7 +168,6 @@ def draw_hand(app):
                     pass
         else:
             try:
-                import customtkinter as ctk
                 label = ctk.CTkLabel(card_frame, text=sixth_card[:15], width=thumb_w, height=thumb_h,
                                      fg_color="gray30", corner_radius=5)
                 label.grid(row=0, column=0)

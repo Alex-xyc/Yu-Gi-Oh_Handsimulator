@@ -36,7 +36,8 @@ def create_hand_section(app: Any, container: Any):
     hand_title.grid(row=0, column=0, sticky='ew')
 
     # Card images frame with horizontal scrollbar using Canvas (responsive)
-    card_canvas = tk.Canvas(hand_frame, bg="#23272b", highlightthickness=0, bd=0, relief="flat")
+    card_canvas = tk.Canvas(hand_frame, bg="#23272b", highlightthickness=0, bd=0, relief="flat",
+                            width=1)  # size comes from the layout divider
     card_canvas.grid(row=1, column=0, padx=10, pady=(6, 0), sticky="nsew")
     # Frame inside the canvas for card images
     cards_frame = tk.Frame(card_canvas, bg="#23272b")
@@ -101,6 +102,7 @@ def create_hand_section(app: Any, container: Any):
         selectforeground="#ffffff",
         padx=8,
         pady=6,
+        width=1,  # size comes from the layout divider
     )
     hand_textbox.grid(row=0, column=0, sticky="nsew")
     try:
