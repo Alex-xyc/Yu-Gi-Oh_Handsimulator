@@ -90,6 +90,13 @@ class TestReport(unittest.TestCase):
         for section in ("BRICK ANALYSIS", "6TH CARD ODDS", "Engine x Non-Engine Matrix"):
             self.assertIn(section, report)
 
+    def test_report_without_hand_categories(self):
+        # Typed counts: totals-based odds stay, hand-based 6th-card odds are left out
+        report = format_statistics_report(40, {BRICK: 5, NON_ENGINE: 16, ENGINE: 19}, None)
+        self.assertIn("At least 1 engine:       96.9%", report)
+        self.assertIn("Tag your cards in the decklist", report)
+        self.assertNotIn("(16/35)", report)
+
 
 class TestCardOdds(unittest.TestCase):
     def test_card_odds_values_and_groups(self):
@@ -110,6 +117,18 @@ class TestCardOdds(unittest.TestCase):
         self.assertEqual(order, sorted(order))
         self.assertLess(text.index("Mixed tags:"), text.index("Split"))
         self.assertNotIn("Brick:", text)
+
+    def test_card_odds_ungrouped(self):
+        deck = YuGiOhDeck()
+        deck.add_card('Ash', 3)
+        for i in range(37):
+            deck.add_card(f'Filler{i}', 1)
+        tags = [ENGINE] * 3 + [NON_ENGINE] * 37
+        text = format_card_odds(pool_from_tags(deck, tags), deck.get_deck_size(), grouped=False)
+        first = (1 - comb(37, 5) / comb(40, 5)) * 100
+        self.assertIn(f"3x   {first:5.1f}%", text)
+        for title in ("Engine:", "Non-Engine:", "Untagged:"):
+            self.assertNotIn(title, text)
 
 
 class TestTextLayout(unittest.TestCase):
