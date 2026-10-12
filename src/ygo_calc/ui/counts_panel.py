@@ -10,8 +10,11 @@ from ..core.categories import BRICK, ENGINE, NON_ENGINE, UNTAGGED
 class CountsPanel(ctk.CTkFrame):
     """Count entries plus the "Apply & Draw Hand" and "Show Decklist" buttons."""
 
-    def __init__(self, master, on_apply: Callable[[], None], on_show_decklist: Callable[[], None],
-                 on_locked_click: Callable[[ctk.CTkEntry], None]):
+    def __init__(self, master, on_apply: Optional[Callable[[], None]],
+                 on_show_decklist: Callable[[], None],
+                 on_locked_click: Callable[[ctk.CTkEntry], None],
+                 on_compare: Optional[Callable[[], None]] = None):
+        """on_apply / on_compare: None leaves out the "Apply & Draw Hand" / "Compare Decks" button."""
         super().__init__(master)
         self.on_locked_click = on_locked_click
         # Create extra columns so we can center the inputs on wide screens
@@ -38,18 +41,25 @@ class CountsPanel(ctk.CTkFrame):
         self._entries = {BRICK: self.brick_entry, NON_ENGINE: self.non_engine_entry,
                          ENGINE: self.engine_entry}
 
-        # Apply and Show Decklist buttons placed next to Engine input (column 7)
+        # Apply, Show Decklist and Compare buttons placed next to Engine input (column 7)
         buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
         buttons_frame.grid(row=2, column=7, padx=(10, 20), pady=10)
-        self.draw_btn = ctk.CTkButton(buttons_frame, text="Apply & Draw Hand", width=165,
-                                      command=on_apply, state="disabled",
-                                      font=ctk.CTkFont(size=14, weight="bold"),
-                                      fg_color="green", hover_color="darkgreen")
-        self.draw_btn.grid(row=0, column=0)
+        self.draw_btn = None
+        if on_apply is not None:
+            self.draw_btn = ctk.CTkButton(buttons_frame, text="Apply & Draw Hand", width=165,
+                                          command=on_apply, state="disabled",
+                                          font=ctk.CTkFont(size=14, weight="bold"),
+                                          fg_color="green", hover_color="darkgreen")
+            self.draw_btn.grid(row=0, column=0, padx=(0, 10))
         self.advanced_btn = ctk.CTkButton(buttons_frame, text="Show Decklist", width=110,
                                           command=on_show_decklist, state="disabled",
                                           font=ctk.CTkFont(size=14, weight="bold"))
-        self.advanced_btn.grid(row=0, column=1, padx=(10, 0))
+        self.advanced_btn.grid(row=0, column=1)
+        if on_compare is not None:
+            # Always enabled: both decks can be loaded in the compare window itself
+            ctk.CTkButton(buttons_frame, text="Compare Decks", width=120, command=on_compare,
+                          font=ctk.CTkFont(size=14, weight="bold"), fg_color="#7c3aed",
+                          hover_color="#5b21b6").grid(row=0, column=2, padx=(10, 0))
 
         # Deck info label, centered across the input area
         self.deck_info_label = ctk.CTkLabel(self, text="No deck loaded",
@@ -79,7 +89,8 @@ class CountsPanel(ctk.CTkFrame):
         self.deck_info_label.configure(text=text, text_color=color)
 
     def enable_actions(self) -> None:
-        self.draw_btn.configure(state="normal")
+        if self.draw_btn is not None:
+            self.draw_btn.configure(state="normal")
         self.advanced_btn.configure(state="normal")
 
     def show_tags(self, tags: Optional[List[str]]) -> None:
@@ -91,6 +102,13 @@ class CountsPanel(ctk.CTkFrame):
                 if tags.count(key):  # Leave 0 empty so it shows the greyed-out placeholder
                     entry.insert(0, str(tags.count(key)))
                 entry.configure(state="disabled")
+
+    def set_counts(self, brick: int, non_engine: int, engine: int) -> None:
+        """Fill in typed counts (unlocking the entries); 0 is left empty."""
+        self.reset_counts()
+        for entry, count in zip(self._entries.values(), (brick, non_engine, engine)):
+            if count:
+                entry.insert(0, str(count))
 
     def reset_counts(self) -> None:
         """Empty every count entry (an empty entry shows the greyed-out 0 and counts as 0)."""

@@ -21,6 +21,7 @@ src/
       probability.py        Hypergeometric maths
       simulation.py         Drawing hands
       report.py             The "Probabilities & Statistics" text
+      comparison.py         The "Compare Decks" odds table
     cards/                Card names and images
       ygoprodeck.py         YGOPRODeck API (primary)
       edopro.py             EDOPro card databases (fallback)
@@ -34,6 +35,8 @@ src/
       stats_panel.py        Probabilities & statistics
       split_view.py         Resizable split between the two panels (with drag preview)
       advanced_view.py      "Show Decklist" overlay for tagging cards
+      compare_view.py       "Compare Decks" overlay: two decks side by side
+      deck_loading.py       Loading a deck code (shared by both views)
       text_layout.py        Deck-list columns and text font fitting
       image_loader.py       Downloading and resizing card images
       window.py  theme.py   Window setup helpers, colours and fonts
