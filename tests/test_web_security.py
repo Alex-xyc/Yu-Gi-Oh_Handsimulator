@@ -113,8 +113,9 @@ class TestOutboundRequests(unittest.TestCase):
         from ygo_calc.cards.http import BlockedURLError, check_url, fetch_bytes
         self.assertTrue(check_url("https://images.ygoprodeck.com/images/cards/1.jpg"))
         self.assertTrue(check_url("https://pics.projectignis.org:2096/pics/1.jpg"))
-        for url in ("http://169.254.169.254/latest/meta-data/", "https://localhost/", "http://images.ygoprodeck.com/1.jpg",
-                    "https://images.ygoprodeck.com.evil.example/1.jpg", "https://a:b@images.ygoprodeck.com/", "file:///etc/passwd"):
+        for url in ("http://169.254.169.254/latest/meta-data/", "https://localhost/",
+                    "http://images.ygoprodeck.com/1.jpg", "https://images.ygoprodeck.com.evil.example/1.jpg",
+                    "https://a:b@images.ygoprodeck.com/", "file:///etc/passwd"):
             with self.assertRaises(BlockedURLError, msg=url):
                 fetch_bytes(url, timeout=1)
 

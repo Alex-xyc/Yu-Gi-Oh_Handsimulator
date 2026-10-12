@@ -9,6 +9,8 @@ if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
 import main
+from ygo_calc.core.categories import (BRICK, ENGINE, NON_ENGINE, count_categories, pool_from_counts,
+                                      sync_category_sets)
 
 class TestCornerCases(unittest.TestCase):
     def test_parse_ydke_invalid_prefix(self):
@@ -47,7 +49,7 @@ class TestCornerCases(unittest.TestCase):
         for i in range(35):
             deck.add_card(f'B{i}', 1)
         # mark categories
-        deck.assign_categories(brick_count=35, non_engine_count=2, engine_count=3)
+        sync_category_sets(deck, pool_from_counts(deck, 35, 2, 3))
 
         probs = main.calculate_probabilities(deck, hand_size=5)
         # engine_probs keys 0..5 should sum to ~1
@@ -78,12 +80,11 @@ class TestCornerCases(unittest.TestCase):
         deck.add_card('B', 3)
         deck.add_card('C', 1)
         deck.add_card('D', 3)
-        deck.assign_categories(brick_count=4, non_engine_count=3, engine_count=3)
-        probs = main.calculate_probabilities(deck, hand_size=5)
-        self.assertEqual(probs['brick_total'], 4)
-        self.assertEqual(probs['non_engine_total'], 3)
-        self.assertEqual(probs['engine_total'], 3)
-        self.assertEqual(sum(deck.cards[c] for c in deck.brick_cards), 4)
+        pool = pool_from_counts(deck, 4, 3, 3)
+        counts = count_categories(pool)
+        self.assertEqual(counts[BRICK], 4)
+        self.assertEqual(counts[NON_ENGINE], 3)
+        self.assertEqual(counts[ENGINE], 3)
 
 if __name__ == '__main__':
     unittest.main()

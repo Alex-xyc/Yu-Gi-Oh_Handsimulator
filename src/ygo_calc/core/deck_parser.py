@@ -49,10 +49,10 @@ def parse_ydk_main_ids(ydk_text: str) -> List[str]:
         if line == "#main":
             in_main_deck = True
             continue
-        elif line in ["#extra", "!side", "#side"]:
+        if line in ["#extra", "!side", "#side"]:
             in_main_deck = False
             continue
-        elif line.startswith("#") or line.startswith("!"):
+        if line.startswith("#") or line.startswith("!"):
             continue
         if in_main_deck and line.isascii() and line.isdigit() and len(line) <= 10:
             card_ids.append(line)

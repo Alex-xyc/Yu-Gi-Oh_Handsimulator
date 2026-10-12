@@ -9,6 +9,7 @@ SRC_PATH = os.path.join(ROOT, 'src')
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
+from ygo_calc.core.categories import pool_from_counts, sync_category_sets
 from ygo_calc.core.deck import YuGiOhDeck
 from ygo_calc.ui.app import YuGiOhHandSimulator
 
@@ -39,8 +40,9 @@ class TestGUISmoke(unittest.TestCase):
                 total += 1
                 i += 1
             # assign categories
-            deck.assign_categories(brick_count=i, non_engine_count=2, engine_count=3)
             app.deck = deck
+            app.card_pool = pool_from_counts(deck, i, 2, 3)
+            sync_category_sets(deck, app.card_pool)
             app.deck_loaded = True
             # call draw_hand and ensure no exceptions and reasonable results
             app.draw_hand()

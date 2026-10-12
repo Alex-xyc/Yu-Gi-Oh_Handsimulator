@@ -39,7 +39,7 @@ def engine_non_engine_probability(deck_size: int, engine_count: int, non_engine_
     if engine_drawn <= engine_count and non_engine_drawn <= non_engine_count:
         other_count = deck_size - engine_count - non_engine_count
         other_in_hand = hand_size - engine_drawn - non_engine_drawn
-        if other_in_hand >= 0 and other_in_hand <= other_count:
+        if 0 <= other_in_hand <= other_count:
             return (comb(engine_count, engine_drawn) *
                     comb(non_engine_count, non_engine_drawn) *
                     comb(other_count, other_in_hand)) / comb(deck_size, hand_size)

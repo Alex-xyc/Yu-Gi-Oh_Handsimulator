@@ -141,8 +141,8 @@ class SplitView(ctk.CTkFrame):
         layout = self._drag['layout']
         delta = left_w - self._drag['start_left']
         self.preview.delete("all")
-        panel = dict(fill=theme.PREVIEW_PANEL_FILL, outline=theme.PREVIEW_PANEL_OUTLINE, width=1)
-        part = dict(fill=theme.PREVIEW_PART_FILL, outline="")
+        panel = {"fill": theme.PREVIEW_PANEL_FILL, "outline": theme.PREVIEW_PANEL_OUTLINE, "width": 1}
+        part = {"fill": theme.PREVIEW_PART_FILL, "outline": ""}
 
         # Left panel grows/shrinks with the divider; its parts stretch with it
         x, y, w, h = layout['left']

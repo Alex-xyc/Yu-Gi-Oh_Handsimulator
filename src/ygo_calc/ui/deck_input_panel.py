@@ -87,6 +87,6 @@ class DeckInputPanel(ctk.CTkFrame):
 
         if filepath:
             self.file_path_label.configure(text=os.path.basename(filepath))
-            with open(filepath, 'r') as f:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                 ydk_content = f.read()
             self.on_load(ydk_content)
