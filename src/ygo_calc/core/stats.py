@@ -1,10 +1,41 @@
 """Opening-hand statistics as plain data (for the web app; report.py formats the same as text)."""
 
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
 from .categories import BRICK, CATEGORIES, ENGINE, NON_ENGINE, CardPool, count_categories
-from .probability import (engine_non_engine_probability, hypergeometric_probability,
-                          probability_at_least)
+from .probability import (category_probability, engine_non_engine_probability,
+                          hypergeometric_probability, probability_at_least)
+
+# Draw counts are passed to each check as (engine, non-engine, brick)
+Drawn = Tuple[int, int, int]
+
+
+class HandOdds(NamedTuple):
+    label: str
+    accept: Callable[[Drawn], bool]
+    higher_is_better: bool
+
+
+# Opening-hand checks shown for one deck (here) and for two side by side (comparison.py)
+HAND_ODDS = [
+    HandOdds("At least 1 engine", lambda d: d[0] >= 1, True),
+    HandOdds("At least 2 engine", lambda d: d[0] >= 2, True),
+    HandOdds("At least 1 non-engine", lambda d: d[1] >= 1, True),
+    HandOdds("At least 2 non-engine", lambda d: d[1] >= 2, True),
+    HandOdds("At least 1 brick", lambda d: d[2] >= 1, False),
+    HandOdds("No bricks", lambda d: d[2] == 0, True),
+    HandOdds("1+ engine & 1+ non-engine", lambda d: d[0] >= 1 and d[1] >= 1, True),
+    HandOdds("1+ engine & no bricks", lambda d: d[0] >= 1 and d[2] == 0, True),
+    HandOdds("1+ engine, 1+ NE, no bricks", lambda d: d[0] >= 1 and d[1] >= 1 and d[2] == 0, True),
+]
+
+
+def pool_hand_odds(pool: CardPool, hand_size: int) -> List[float]:
+    """Chance of each HAND_ODDS entry, in that order."""
+    counts = count_categories(pool)
+    category_counts = (counts[ENGINE], counts[NON_ENGINE], counts[BRICK])
+    return [category_probability(len(pool), category_counts, hand_size, odds.accept)
+            for odds in HAND_ODDS]
 
 
 def opening_stats(pool: CardPool, hand_categories: Optional[List[str]] = None,
@@ -48,9 +79,17 @@ def opening_stats(pool: CardPool, hand_categories: Optional[List[str]] = None,
             sixth_card[key] = {"remaining": left, "probability": left / remaining}
         sixth_card["deck_remaining"] = remaining
 
+    # The combinations not already covered by at_least
+    combinations = [{"label": odds.label, "probability": p}
+                    for odds, p in zip(HAND_ODDS, pool_hand_odds(pool, hand_size))
+                    if not odds.label.startswith("At least")]
+    averages = {key: hand_size * counts[key] / deck_size if deck_size else 0.0 for key in CATEGORIES}
+
     return {
         "deck_size": deck_size,
         "hand_size": hand_size,
+        "combinations": combinations,
+        "averages": averages,
         "counts": {**counts, "untagged": deck_size - sum(counts.values())},
         "matrix": matrix,
         "at_least": at_least,

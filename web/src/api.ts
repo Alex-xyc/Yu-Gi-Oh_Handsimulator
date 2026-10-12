@@ -40,6 +40,10 @@ export interface CardOdds {
 export interface Stats {
   deck_size: number;
   hand_size: number;
+  /** Opening-hand combinations, e.g. "1+ engine & no bricks" */
+  combinations: { label: string; probability: number }[];
+  /** Average number of each label in the opening hand */
+  averages: Record<TagKey, number>;
   counts: Record<TagKey | "untagged", number>;
   matrix: (number | null)[][];
   /** Chance of at least 1, 2, … hand_size cards of each category */
@@ -62,13 +66,32 @@ export interface DrawResult {
   stats: Stats;
 }
 
+/** One probability for both decks; better is the deck with the better value, if either */
+export interface OddsPair {
+  label: string;
+  a: number;
+  b: number;
+  better: 1 | 2 | null;
+}
+
 export interface Comparison {
   hand_size: number;
   names: [string, string];
   composition: { label: string; a: number; b: number }[];
-  odds: { label: string; a: number; b: number; better: 1 | 2 | null }[];
+  /** Combinations (e.g. 1+ engine & no bricks); also a few of the at_least rows */
+  odds: OddsPair[];
+  /** Chance of at least 1..hand_size of each category, as on the main page */
+  at_least: { key: TagKey; label: string; rows: OddsPair[] }[];
+  /** Open with a brick, draw one as the next card, see one by then */
+  bricks: OddsPair[];
   averages: { label: string; a: number; b: number }[];
   cards: { name: string; a_copies: number; b_copies: number; changed: boolean; a: number; b: number }[];
+}
+
+/** The opening-hand combinations not already in the "X or more" breakdown */
+export function combinationOdds(result: Comparison): OddsPair[] {
+  const inBreakdown = new Set(result.at_least.flatMap((group) => group.rows.map((row) => row.label)));
+  return result.odds.filter((row) => !inBreakdown.has(row.label));
 }
 
 export class ApiError extends Error {}
@@ -95,7 +118,9 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 
 export const api = {
   loadDeck: (code: string) => post<{ cards: DeckCard[]; size: number }>("/api/decks", { code }),
-  stats: (deck: DeckSetupBody, signal?: AbortSignal) => post<Stats>("/api/stats", deck, signal),
+  /** handSize 6 gives the odds going second */
+  stats: (deck: DeckSetupBody, signal?: AbortSignal, handSize = 5) =>
+    post<Stats>(`/api/stats?hand_size=${handSize}`, deck, signal),
   draw: (deck: DeckSetupBody) => post<DrawResult>("/api/draw", { deck }),
   compare: (decks: [DeckSetupBody, DeckSetupBody], handSize: number) =>
     post<Comparison>("/api/compare", { decks, hand_size: handSize }),

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { api, Category, DeckCard, DeckSetupBody } from "./api";
+import { SavedDeck } from "./storage";
 
 export interface DeckSetup {
   cards: DeckCard[] | null;
@@ -18,18 +19,20 @@ export interface DeckSetup {
   labelled: boolean;
   load: (code: string, name?: string) => Promise<void>;
   applyTags: (tags: Category[]) => void;
-  copyFrom: (other: DeckSetup) => void;
+  /** Back to no deck (when its tab is closed) */
+  reset: () => void;
   body: (name: string) => DeckSetupBody | null;
 }
 
 const unlabelled = (cards: DeckCard[]) =>
   Array<Category>(cards.reduce((total, card) => total + card.copies, 0)).fill("");
 
-export function useDeckSetup(): DeckSetup {
-  const [cards, setCards] = useState<DeckCard[] | null>(null);
-  const [name, setName] = useState<string | null>(null);
+/** `initial`: a deck saved before the page was refreshed */
+export function useDeckSetup(initial?: SavedDeck): DeckSetup {
+  const [cards, setCards] = useState<DeckCard[] | null>(initial?.cards ?? null);
+  const [name, setName] = useState<string | null>(initial?.name ?? null);
   const [loading, setLoading] = useState(false);
-  const [tags, setTags] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Category[]>(initial?.tags ?? []);
 
   const deckList = useMemo(
     () => (cards ?? []).flatMap((card) => Array<string>(card.copies).fill(card.name)),
@@ -52,10 +55,10 @@ export function useDeckSetup(): DeckSetup {
     }
   }, []);
 
-  const copyFrom = useCallback((other: DeckSetup) => {
-    setCards(other.cards);
-    setName(other.name);
-    setTags(other.tags);
+  const reset = useCallback(() => {
+    setCards(null);
+    setName(null);
+    setTags([]);
   }, []);
 
   const body = useCallback(
@@ -70,6 +73,6 @@ export function useDeckSetup(): DeckSetup {
   return useMemo(() => ({
     cards, name, deckList, idByName, size: deckList.length, loading, tags,
     labelled: tags.some(Boolean),
-    load, applyTags: setTags, copyFrom, body,
-  }), [cards, name, deckList, idByName, loading, tags, load, copyFrom, body]);
+    load, applyTags: setTags, reset, body,
+  }), [cards, name, deckList, idByName, loading, tags, load, reset, body]);
 }

@@ -100,6 +100,19 @@ class TestWebApi(unittest.TestCase):
         response = self.client.post("/api/draw", json={"deck": setup_body(tags=[ENGINE] * 3)})
         self.assertEqual(response.status_code, 400)
 
+    def test_stats_going_second(self):
+        body = setup_body(counts={"brick": 4, "non_engine": 9, "engine": 12})
+        first = self.client.post("/api/stats", json=body).json()
+        second = self.client.post("/api/stats?hand_size=6", json=body).json()
+        self.assertEqual((first["hand_size"], second["hand_size"]), (5, 6))
+        self.assertEqual(len(second["at_least"]["engine"]), 6)
+        self.assertGreater(second["bricks"]["open"], first["bricks"]["open"])
+        self.assertAlmostEqual(first["averages"]["engine"], 5 * 12 / 40)
+        labels = [row["label"] for row in first["combinations"]]
+        self.assertIn("No bricks", labels)
+        self.assertNotIn("At least 1 engine", labels)  # already in at_least
+        self.assertEqual(self.client.post("/api/stats?hand_size=7", json=body).status_code, 422)
+
     def test_compare(self):
         a = setup_body(counts={"brick": 4, "non_engine": 9, "engine": 12})
         b = setup_body(name="Other", counts={"brick": 2, "non_engine": 9, "engine": 15})
@@ -108,6 +121,15 @@ class TestWebApi(unittest.TestCase):
         first = data["odds"][0]
         self.assertEqual(first["label"], "At least 1 engine")
         self.assertEqual(first["better"], 2)
+        # The main page's statistics too: at least 1..6 of each category, and the brick odds
+        self.assertEqual([group["key"] for group in data["at_least"]], ["engine", "non_engine", "brick"])
+        self.assertTrue(all(len(group["rows"]) == 6 for group in data["at_least"]))
+        brick_1 = data["at_least"][2]["rows"][0]
+        self.assertEqual(brick_1["label"], "At least 1 brick")
+        self.assertEqual(brick_1["better"], 2)  # fewer bricks in the other deck
+        self.assertEqual([row["label"] for row in data["bricks"]],
+                         ["Open with a brick", "Draw one 7th", "See one in the first 7 cards"])
+        self.assertAlmostEqual(data["bricks"][0]["a"], brick_1["a"])
 
     def test_image_rejects_bad_ids(self):
         self.assertEqual(self.client.get("/api/cards/abc/image").status_code, 404)

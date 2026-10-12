@@ -11,12 +11,12 @@ import { CardImage } from "./common";
 // Cards scale with the panel, up to about 115px wide
 const GRID = "mx-auto grid w-full max-w-[380px] grid-cols-3 gap-x-3 gap-y-4 pt-2.5 perspective-[1200px]";
 const FACE = "absolute inset-0 overflow-hidden rounded-lg backface-hidden shadow-[0_10px_26px_rgba(0,0,0,0.5)]";
-const SIXTH_FRAME = "shadow-[0_0_0_3px_var(--sixth),0_0_20px_color-mix(in_srgb,var(--sixth)_45%,transparent)]";
+const SIXTH_FRAME = "shadow-[0_0_0_3px_var(--color-sixth),0_0_20px_color-mix(in_srgb,var(--color-sixth)_45%,transparent)]";
 
 function SixthLabel() {
   return (
     <span className="absolute -top-2.5 left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap rounded-full bg-sixth px-2
-                     py-px text-[10px] font-extrabold tracking-wider text-[#0b0d12] uppercase shadow-md">
+                     py-px text-[10px] font-extrabold tracking-wider text-ink uppercase shadow-md">
       6th card
     </span>
   );
@@ -41,7 +41,7 @@ function HandCard({ card, id, index, showCategory }: {
         <div className={FACE}>
           <CardImage id={id} name={card.name} size="full" className="h-full" />
           {showCategory && card.category && (
-            <span className={`hand-badge tone-${card.category}`}>{CATEGORY_LABELS[card.category]}</span>
+            <span className={`card-badge hand-badge tone-${card.category}`}>{CATEGORY_LABELS[card.category]}</span>
           )}
         </div>
         <div className={`${FACE} rotate-y-180`}><CardBack /></div>

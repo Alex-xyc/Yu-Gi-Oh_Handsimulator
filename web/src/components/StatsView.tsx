@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { memo } from "react";
 import { CardOdds, CATEGORIES, CATEGORY_LABELS, percent, Stats } from "../api";
-import { AnimatedPercent, Bar } from "./common";
+import { AnimatedPercent, Bar, Dot, SectionHeader, StatTile } from "./common";
 
 const GROUPS: { key: CardOdds["group"]; title: string }[] = [
   { key: "engine", title: "Engine" },
@@ -24,14 +24,14 @@ function ChartIcon() {
     <svg className="chart-icon" viewBox="0 0 120 84" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <defs>
         <linearGradient id="chart-line" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="var(--accent)" />
-          <stop offset="1" stopColor="var(--deck-b)" />
+          <stop offset="0" stopColor="var(--color-accent)" />
+          <stop offset="1" stopColor="var(--color-deck-b)" />
         </linearGradient>
       </defs>
-      <motion.path d="M 10 6 V 74 H 112" stroke="var(--muted)" strokeOpacity="0.55" strokeWidth="4" {...draw(0)} />
+      <motion.path d="M 10 6 V 74 H 112" stroke="var(--color-muted)" strokeOpacity="0.55" strokeWidth="4" {...draw(0)} />
       <motion.path d="M 22 62 C 26 46, 30 42, 34 52 S 42 62, 48 50 S 58 38, 64 48 S 78 52, 98 18"
                    stroke="url(#chart-line)" strokeWidth="5" {...draw(0.35)} />
-      <motion.path d="M 84 16 L 99 16 L 99 31" stroke="var(--deck-b)" strokeWidth="5" {...draw(1.1)} />
+      <motion.path d="M 84 16 L 99 16 L 99 31" stroke="var(--color-deck-b)" strokeWidth="5" {...draw(1.1)} />
     </svg>
   );
 }
@@ -39,7 +39,7 @@ function ChartIcon() {
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <motion.section className="stats-section" layout="position">
-      <h3>{title}{hint && <span className="muted small"> {hint}</span>}</h3>
+      <SectionHeader title={title} hint={hint} />
       {children}
     </motion.section>
   );
@@ -59,17 +59,10 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
 
   return (
     <div className="stats">
-      <div className="composition">
-        <div className="stat-tile"><span className="stat-value">{stats.deck_size}</span><span className="muted">cards</span></div>
-        {CATEGORIES.map((key) => (
-          <div key={key} className={`stat-tile tone-${key}`}>
-            <span className="stat-value">{stats.counts[key]}</span>
-            <span className="muted">{CATEGORY_LABELS[key]}</span>
-          </div>
-        ))}
-        {stats.counts.untagged > 0 && (
-          <div className="stat-tile"><span className="stat-value">{stats.counts.untagged}</span><span className="muted">Untagged</span></div>
-        )}
+      <div className="stat-tiles">
+        <StatTile value={stats.deck_size} label="cards" />
+        {CATEGORIES.map((key) => <StatTile key={key} value={stats.counts[key]} label={CATEGORY_LABELS[key]} tone={key} />)}
+        {stats.counts.untagged > 0 && <StatTile value={stats.counts.untagged} label="Untagged" />}
       </div>
 
       <Section title="Opening hand" hint="(chance of drawing X or more)">
@@ -92,12 +85,15 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
         <div className="matrix-wrap">
           <table className="matrix">
             <thead>
-              <tr><th />{stats.matrix[0].map((_, ne) => <th key={ne}>{ne} NE</th>)}</tr>
+              <tr>
+                <th scope="col"><span className="sr-only">Engine drawn</span></th>
+                {stats.matrix[0].map((_, ne) => <th key={ne} scope="col"><abbr title={`${ne} non-engine`}>{ne} NE</abbr></th>)}
+              </tr>
             </thead>
             <tbody>
               {stats.matrix.map((row, e) => (
                 <tr key={e}>
-                  <th>{e} E</th>
+                  <th scope="row"><abbr title={`${e} engine`}>{e} E</abbr></th>
                   {row.map((p, ne) => (
                     <td key={ne} className="mono"
                         style={{ ["--heat" as string]: p ? String(0.08 + 0.72 * (p / maxCell)) : "0" }}>
@@ -112,10 +108,10 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
       </Section>
 
       <Section title="Bricks">
-        <div className="tiles">
-          <div className="stat-tile wide"><span className="stat-value"><AnimatedPercent value={stats.bricks.open} /></span><span className="muted">Open with a brick</span></div>
-          <div className="stat-tile wide"><span className="stat-value"><AnimatedPercent value={stats.bricks.draw_sixth} /></span><span className="muted">Draw one 6th</span></div>
-          <div className="stat-tile wide"><span className="stat-value"><AnimatedPercent value={stats.bricks.by_turn_one} /></span><span className="muted">See one by turn 1</span></div>
+        <div className="stat-tiles">
+          <StatTile wide value={<AnimatedPercent value={stats.bricks.open} />} label="Open with a brick" />
+          <StatTile wide value={<AnimatedPercent value={stats.bricks.draw_sixth} />} label="Draw one 6th" />
+          <StatTile wide value={<AnimatedPercent value={stats.bricks.by_turn_one} />} label="See one by turn 1" />
         </div>
       </Section>
 
@@ -139,16 +135,16 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
       </Section>
 
       <Section title="Card odds" hint="(at least 1 copy)">
-        <table className="card-odds">
+        <table className="data-table">
           <thead>
-            <tr><th>Qty</th><th>Going first</th><th>Going second</th><th>Card</th></tr>
+            <tr><th scope="col">Qty</th><th scope="col">Going first</th><th scope="col">Going second</th><th scope="col">Card</th></tr>
           </thead>
           {GROUPS.map(({ key, title }) => {
             const cards = stats.cards.filter((c) => c.group === key);
             if (!cards.length) return null;
             return (
               <tbody key={key}>
-                {grouped && <tr className="group-row"><td colSpan={4}><i className={`dot tone-${key}`} />{title}</td></tr>}
+                {grouped && <tr className="group-row"><td colSpan={4}><Dot tone={key} />{title}</td></tr>}
                 {cards.map((card) => (
                   <tr key={card.name}>
                     <td className="mono">{card.copies}×</td>

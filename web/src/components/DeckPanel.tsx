@@ -1,4 +1,4 @@
-// Loading a deck (ydke:// code or .ydk file) and setting its categories
+// Loading a deck (ydke:// code or .ydk file) and showing its label totals
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { DragEvent, memo, useRef, useState } from "react";
 import { CATEGORIES, CATEGORY_LABELS } from "../api";
 import { DeckSetup } from "../useDeckSetup";
-import { Spinner } from "./common";
+import { Dot, Spinner } from "./common";
 
 export const DeckLoader = memo(function DeckLoader({ setup, onError }: { setup: DeckSetup; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
@@ -67,29 +67,24 @@ export const DeckLoader = memo(function DeckLoader({ setup, onError }: { setup: 
   );
 });
 
-/** A deck's label totals and a button to open the labelling view (used in the compare view). */
-export function CategoryControls({ setup, onShowDecklist }: { setup: DeckSetup; onShowDecklist: () => void }) {
+/** A deck's size and label totals (used in the compare view; labelling is done in the deck's tab) */
+export function DeckStatus({ setup }: { setup: DeckSetup }) {
   const count = (key: string) => setup.tags.filter((t) => t === key).length;
   const unlabelled = count("");
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Button variant="outlined" color="inherit" onClick={onShowDecklist} disabled={!setup.cards}>
-        Label decklist
-      </Button>
-      <motion.div className="deck-status" key={`${setup.size}-${setup.tags.join()}`}
-                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-        {!setup.cards ? (
-          <span className="muted">No deck loaded</span>
-        ) : (
-          <span className="flex flex-wrap items-center gap-x-3">
-            <span className="ok">✓ {setup.size} cards</span>
-            {CATEGORIES.map((key) => (
-              <span key={key} className="muted"><i className={`dot tone-${key}`} />{count(key)} {CATEGORY_LABELS[key]}</span>
-            ))}
-            {unlabelled > 0 && <span className="muted">{unlabelled} unlabelled</span>}
-          </span>
-        )}
-      </motion.div>
-    </div>
+    <motion.div className="deck-status" key={`${setup.size}-${setup.tags.join()}`}
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+      {!setup.cards ? (
+        <span className="muted">No deck loaded. Load one in its tab.</span>
+      ) : (
+        <span className="flex flex-wrap items-center gap-x-3">
+          <span className="ok">✓ {setup.size} cards</span>
+          {CATEGORIES.map((key) => (
+            <span key={key} className="muted"><Dot tone={key} />{count(key)} {CATEGORY_LABELS[key]}</span>
+          ))}
+          {unlabelled > 0 && <span className="muted">{unlabelled} unlabelled</span>}
+        </span>
+      )}
+    </motion.div>
   );
 }

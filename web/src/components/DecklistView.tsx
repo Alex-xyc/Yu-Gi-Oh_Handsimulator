@@ -1,6 +1,5 @@
-// Tag each card copy as engine / non-engine / brick by clicking it. On the main page the controls
-// (TagControls) and the cards (TagGrid) sit in different panels and share one useTagEditor; the
-// compare view shows both together in an overlay (DecklistView).
+// Tag each card copy as engine / non-engine / brick by clicking it. The controls (TagControls)
+// and the cards (TagGrid) sit in different panels of a deck tab and share one useTagEditor.
 
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -160,7 +159,8 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, scroll = false,
       {editor.deckList.map((name, index) => {
         const tag = editor.tags[index];
         return (
-          <motion.button key={index} className={`tag-tile ${tag ? `tagged tone-${tag}` : ""}`}
+          <motion.button key={index} type="button" className={`tag-tile ${tag ? `tagged tone-${tag}` : ""}`}
+                         aria-label={`${name}, ${tag ? CATEGORY_LABELS[tag] : "unlabelled"}`}
                          title={name}
                          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                          transition={{ delay: Math.min(index * 0.008, 0.3) }}
@@ -169,29 +169,10 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, scroll = false,
                          onContextMenu={(e) => { e.preventDefault(); editor.tagCard(index, ""); }}>
             <CardImage id={idByName[name]} name={name} />
             <span className="tile-tint" />
-            {tag && <span className={`tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
+            {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
           </motion.button>
         );
       })}
     </div>
   );
 });
-
-/** Controls and cards together in an overlay (used by the compare view): changes apply on Done. */
-export function DecklistView({ deckList, idByName, initialTags, onDone }: {
-  deckList: string[];
-  idByName: Record<string, string>;
-  initialTags: Category[];
-  onDone: (tags: Category[]) => void;
-}) {
-  const [tags, setTags] = useState<Category[]>(initialTags);
-  const editor = useTagEditor({ deckList, tags, onChange: setTags });
-  return (
-    <div className="flex flex-col gap-3.5">
-      <h2 className="text-lg">Label your decklist</h2>
-      <TagControls editor={editor}
-                   actions={<Button variant="contained" size="small" onClick={() => onDone(tags)}>Done</Button>} />
-      <TagGrid editor={editor} idByName={idByName} tileSize={104} />
-    </div>
-  );
-}

@@ -1,31 +1,10 @@
 """Side-by-side opening-hand odds for two decks (the "Compare Decks" window)."""
 
-from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional
 
 from .categories import BRICK, ENGINE, NON_ENGINE, CardPool, count_categories
-from .probability import category_probability, probability_at_least
-
-# Draw counts are passed to each check as (engine, non-engine, brick)
-Drawn = Tuple[int, int, int]
-
-
-class HandOdds(NamedTuple):
-    label: str
-    accept: Callable[[Drawn], bool]
-    higher_is_better: bool
-
-
-HAND_ODDS = [
-    HandOdds("At least 1 engine", lambda d: d[0] >= 1, True),
-    HandOdds("At least 2 engine", lambda d: d[0] >= 2, True),
-    HandOdds("At least 1 non-engine", lambda d: d[1] >= 1, True),
-    HandOdds("At least 2 non-engine", lambda d: d[1] >= 2, True),
-    HandOdds("At least 1 brick", lambda d: d[2] >= 1, False),
-    HandOdds("No bricks", lambda d: d[2] == 0, True),
-    HandOdds("1+ engine & 1+ non-engine", lambda d: d[0] >= 1 and d[1] >= 1, True),
-    HandOdds("1+ engine & no bricks", lambda d: d[0] >= 1 and d[2] == 0, True),
-    HandOdds("1+ engine, 1+ NE, no bricks", lambda d: d[0] >= 1 and d[1] >= 1 and d[2] == 0, True),
-]
+from .probability import probability_at_least
+from .stats import HAND_ODDS, HandOdds, opening_stats, pool_hand_odds  # noqa: F401 (HandOdds re-exported)
 
 LABEL_W = 30
 COL_W = 10
@@ -50,10 +29,7 @@ class DeckSummary(NamedTuple):
 
 def hand_odds(deck: DeckSummary, hand_size: int) -> List[float]:
     """Chance of each HAND_ODDS entry, in that order."""
-    counts = count_categories(deck.pool)
-    category_counts = (counts[ENGINE], counts[NON_ENGINE], counts[BRICK])
-    return [category_probability(deck.size, category_counts, hand_size, odds.accept)
-            for odds in HAND_ODDS]
+    return pool_hand_odds(deck.pool, hand_size)
 
 
 def _better(diff: float, higher_is_better: Optional[bool], deck_1: str, deck_2: str) -> str:
@@ -160,7 +136,9 @@ def format_card_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: 
 
 
 def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) -> Dict:
-    """The same comparison as format_comparison, as plain data (for the web app).
+    """The same comparison as format_comparison, as plain data (for the web app), plus the
+    rest of the main page's statistics for both decks: the chance of drawing at least
+    1..hand_size of each category, and the brick odds.
 
     Probabilities are 0..1. "better" is 1 or 2 for the deck with the better value, or
     None when they're (about) equal or neither is better.
@@ -192,6 +170,31 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
             "b": hand_size * counts_2[key] / deck_2.size if deck_2.size else 0.0,
         })
 
+    # The main page's statistics for each deck, at this hand size
+    stats_1 = opening_stats(deck_1.pool, hand_size=hand_size, grouped=False)
+    stats_2 = opening_stats(deck_2.pool, hand_size=hand_size, grouped=False)
+
+    def pair(label: str, p_1: float, p_2: float, higher_is_better: bool) -> Dict:
+        return {"label": label, "a": p_1, "b": p_2, "better": better(p_2 - p_1, higher_is_better)}
+
+    # More engine and non-engine is better, more bricks is worse
+    at_least = []
+    for key, label, noun in ((ENGINE, "Engine", "engine"), (NON_ENGINE, "Non-Engine", "non-engine"),
+                             (BRICK, "Brick", "brick")):
+        at_least.append({"key": key, "label": label, "rows": [
+            pair(f"At least {k} {noun}", p_1, p_2, key != BRICK)
+            for k, (p_1, p_2) in enumerate(zip(stats_1["at_least"][key], stats_2["at_least"][key]), 1)
+        ]})
+
+    # The next card after the opening hand: the 6th going first, the 7th going second
+    next_card = hand_size + 1
+    seen_label = "See one by turn 1" if hand_size == 5 else f"See one in the first {next_card} cards"
+    bricks = [
+        pair("Open with a brick", stats_1["bricks"]["open"], stats_2["bricks"]["open"], False),
+        pair(f"Draw one {next_card}th", stats_1["bricks"]["draw_sixth"], stats_2["bricks"]["draw_sixth"], False),
+        pair(seen_label, stats_1["bricks"]["by_turn_one"], stats_2["bricks"]["by_turn_one"], False),
+    ]
+
     copies_1, copies_2 = deck_1.copies(), deck_2.copies()
     names = list(copies_1) + [name for name in copies_2 if name not in copies_1]
     cards = []
@@ -205,4 +208,5 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
     cards.sort(key=lambda card: not card["changed"])  # Changed cards first, else deck order
 
     return {"hand_size": hand_size, "names": [deck_1.name, deck_2.name],
-            "composition": composition, "odds": odds, "averages": averages, "cards": cards}
+            "composition": composition, "odds": odds, "at_least": at_least, "bricks": bricks,
+            "averages": averages, "cards": cards}

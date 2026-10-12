@@ -4,8 +4,9 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, Variants } from "framer-motion";
-import { ReactNode, useEffect, useLayoutEffect, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cardImageUrl } from "../api";
 
 /** A card picture, or its name on a plain tile when there's no image. */
@@ -47,9 +48,11 @@ const CONTENT: Variants = {
 
 /** Full-window overlay panel that fades and slides in, like the desktop app's overlays.
  *  With `keepMounted` its contents are built once and kept (hidden) while closed, so opening and
- *  closing only run the animation; building a large view at that moment stalls the fade. */
-export function Overlay({ open, onClose, children, label, keepMounted = false }: {
-  open: boolean; onClose: () => void; children: ReactNode; label: string; keepMounted?: boolean;
+ *  closing only run the animation; building a large view at that moment stalls the fade.
+ *  With `asWindow` it's a smaller centred window over the dimmed page instead, closed by clicking
+ *  outside it. Focus moves into it while open; the page behind should be made inert meanwhile. */
+export function Overlay({ open, onClose, children, label, keepMounted = false, asWindow = false }: {
+  open: boolean; onClose: () => void; children: ReactNode; label: string; keepMounted?: boolean; asWindow?: boolean;
 }) {
   // Rendered from the first open (or from the start with keepMounted) and then kept
   const [mounted, setMounted] = useState(open || keepMounted);
@@ -66,13 +69,36 @@ export function Overlay({ open, onClose, children, label, keepMounted = false }:
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Keyboard focus moves into the panel on opening, and back to where it was on closing (only
+  // on closing, so an effect that runs twice, as in React's development mode, doesn't undo it)
+  const panel = useRef<HTMLDivElement>(null);
+  const restoreTo = useRef<HTMLElement | null>(null);
+  const opened = open && !hidden;
+  useEffect(() => {
+    if (opened) {
+      const focused = document.activeElement as HTMLElement | null;
+      if (!restoreTo.current && focused !== document.body && !panel.current?.contains(focused)) restoreTo.current = focused;
+      // A frame later: until the browser has restyled it, the panel still counts as hidden
+      const frame = requestAnimationFrame(() => panel.current?.focus({ preventScroll: true }));
+      return () => cancelAnimationFrame(frame);
+    } else if (restoreTo.current) {
+      const target = restoreTo.current;
+      restoreTo.current = null;
+      // A frame later, once the page behind is no longer inert
+      requestAnimationFrame(() => target.focus({ preventScroll: true }));
+    }
+  }, [opened]);
+
   if (!mounted) return null;
   return (
-    <motion.div className="overlay-backdrop" role="dialog" aria-modal="true" aria-label={label}
-                style={{ visibility: hidden ? "hidden" : "visible" }}
+    // Hidden with a class, not motion's style: motion applies style a frame later, and the panel
+    // must be visible at once to take focus
+    <motion.div className={`overlay-backdrop ${asWindow ? "window" : ""} ${hidden ? "invisible" : ""}`}
+                role="dialog" aria-modal="true" aria-label={label}
+                onMouseDown={asWindow ? (e) => { if (e.target === e.currentTarget) onClose(); } : undefined}
                 variants={BACKDROP} initial="closed" animate={open ? "open" : "closed"}
                 onAnimationComplete={(state) => { if (state === "closed") setHidden(true); }}>
-      <motion.div className="overlay-panel" variants={PANEL}>
+      <motion.div className="overlay-panel" variants={PANEL} ref={panel} tabIndex={-1}>
         <motion.div variants={CONTENT}>{children}</motion.div>
       </motion.div>
     </motion.div>
@@ -165,6 +191,47 @@ export function Bar({ value, tone }: { value: number; tone: string }) {
       <motion.div className={`bar-fill tone-${tone}`} initial={false}
                   animate={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
                   transition={{ type: "spring", stiffness: 140, damping: 22 }} />
+    </div>
+  );
+}
+
+/** A colour of a label or deck, as used by the tone-* classes */
+export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged";
+
+/** The tone of a deck in the comparison: side 0 is deck A (blue), side 1 deck B (pink) */
+export const deckTone = (side: number): Tone => (side ? "deck-b" : "deck-a");
+
+/** A small coloured dot in front of a label (decorative: the label says what it is) */
+export function Dot({ tone }: { tone?: Tone }) {
+  return <i className={`dot ${tone ? `tone-${tone}` : ""}`} aria-hidden="true" />;
+}
+
+/** A name that shortens with an ellipsis when it doesn't fit; hovering shows it in full */
+export function TruncatedName({ children }: { children: string }) {
+  return <Tooltip title={children}><span className="truncate-name">{children}</span></Tooltip>;
+}
+
+/** A panel (h2) or section (h3) title, an optional muted hint after it, and an optional action
+ *  (e.g. an Export button) on the right */
+export function SectionHeader({ as: Heading = "h3", title, hint, action, id }: {
+  as?: "h2" | "h3";
+  title: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+  /** For aria-labelledby on the section */
+  id?: string;
+}) {
+  const heading = <Heading id={id}>{title}{hint && <span className="muted small font-normal"> {hint}</span>}</Heading>;
+  if (!action) return heading;
+  return <div className="section-header">{heading}{action}</div>;
+}
+
+/** A number with a caption under it, e.g. "40 cards"; tone adds a coloured edge */
+export function StatTile({ value, label, tone, wide = false }: { value: ReactNode; label: string; tone?: Tone; wide?: boolean }) {
+  return (
+    <div className={`stat-tile ${tone ? `tone-${tone}` : ""} ${wide ? "wide" : ""}`}>
+      <span className="stat-value">{value}</span>
+      <span className="muted">{label}</span>
     </div>
   );
 }

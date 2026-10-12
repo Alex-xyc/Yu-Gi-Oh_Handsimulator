@@ -1,7 +1,9 @@
-// The MUI theme: the app's dark look (colours, shapes, buttons, inputs, dialogs) in one place.
+// The MUI theme: the app's dark look (colours, shapes, buttons, inputs, menus) in one place.
 // Component colours can use the tag and deck colours too, e.g. <Button color="engine">.
+// All values come from the design tokens (src/design/tokens.ts).
 
 import { alpha, createTheme, PaletteColor, PaletteColorOptions, ThemeOptions } from "@mui/material/styles";
+import { colors, ease, font } from "./design/tokens";
 
 type AppColor = "engine" | "nonEngine" | "brick" | "deckA" | "deckB";
 
@@ -18,31 +20,31 @@ declare module "@mui/material/ToggleButton" { interface ToggleButtonPropsColorOv
 declare module "@mui/material/Chip" { interface ChipPropsColorOverrides extends ColorOverrides {} }
 declare module "@mui/material/Checkbox" { interface CheckboxPropsColorOverrides extends ColorOverrides {} }
 
-// Keep in step with the colour tokens at the top of styles.css
-const ACCENT = "#7c5cff";
-const TEXT = "#e9ebf2";
-const MUTED = "#8a92a6";
-const SURFACE_2 = "#1c202b";
-const SURFACE_3 = "#252a37";
-const BORDER_STRONG = "rgba(255, 255, 255, 0.13)";
-const EASE = "cubic-bezier(0.2, 0.7, 0.2, 1)";
+const ACCENT = colors.accent;
+const TEXT = colors.text;
+const MUTED = colors.muted;
+const SURFACE_2 = colors["surface-2"];
+const SURFACE_3 = colors["surface-3"];
+const BORDER_STRONG = colors["line-strong"];
+const EASE = ease;
 const COLORS: Record<AppColor | "primary", string> = {
-  primary: ACCENT, engine: "#22c55e", nonEngine: "#eab308", brick: "#ef4444", deckA: "#4f8dff", deckB: "#f472b6",
+  primary: ACCENT, engine: colors.engine, nonEngine: colors["non-engine"], brick: colors.brick,
+  deckA: colors["deck-a"], deckB: colors["deck-b"],
 };
 
 const base = createTheme({
   palette: {
     mode: "dark",
-    primary: { main: ACCENT, light: "#8f74ff", contrastText: "#fff" },
-    error: { main: "#ef4444", light: "#f87171" },
-    success: { main: "#22c55e", light: "#4ade80" },
-    background: { default: "#0a0c11", paper: "#151821" },
+    primary: { main: ACCENT, light: colors["accent-hover"], dark: colors["accent-strong"], contrastText: "#fff" },
+    error: { main: colors.brick, light: colors.danger },
+    success: { main: colors.engine, light: colors.ok },
+    background: { default: colors.bg, paper: colors.surface },
     text: { primary: TEXT, secondary: MUTED },
-    divider: "rgba(255, 255, 255, 0.07)",
+    divider: colors.line,
   },
   shape: { borderRadius: 10 },
   typography: {
-    fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
+    fontFamily: font.sans,
     fontSize: 14,
     button: { textTransform: "none", fontWeight: 600, letterSpacing: 0 },
   },
@@ -53,11 +55,12 @@ const color = (main: string, contrastText?: string) =>
 
 const options: ThemeOptions = {
   palette: {
-    engine: color(COLORS.engine, "#0b0d12"),
-    nonEngine: color(COLORS.nonEngine, "#0b0d12"),
-    brick: color(COLORS.brick),
-    deckA: color(COLORS.deckA),
-    deckB: color(COLORS.deckB, "#0b0d12"),
+    // Dark text on the bright colours keeps it readable (WCAG AA)
+    engine: color(COLORS.engine, colors.ink),
+    nonEngine: color(COLORS.nonEngine, colors.ink),
+    brick: color(COLORS.brick, colors.ink),
+    deckA: color(COLORS.deckA, colors.ink),
+    deckB: color(COLORS.deckB, colors.ink),
   },
   components: {
     MuiButtonBase: { defaultProps: { disableRipple: true } },
@@ -76,13 +79,13 @@ const options: ThemeOptions = {
         sizeLarge: { height: 44, padding: "0 22px", fontSize: 15 },
       },
       variants: [
-        // Filled primary: the glowing purple gradient
+        // Filled primary: the glowing purple gradient, dark enough for white text (WCAG AA)
         { props: { variant: "contained", color: "primary" },
           style: {
-            background: `linear-gradient(180deg, #8f74ff, ${ACCENT})`,
+            background: `linear-gradient(180deg, ${ACCENT}, ${colors["accent-strong"]})`,
             boxShadow: `0 6px 20px ${alpha(ACCENT, 0.35)}`,
-            "&:hover": { background: "linear-gradient(180deg, #a08aff, #8f74ff)", boxShadow: `0 8px 28px ${alpha(ACCENT, 0.5)}` },
-            "&.Mui-disabled": { color: "#fff", background: ACCENT },
+            "&:hover": { background: `linear-gradient(180deg, ${colors["accent-hover"]}, ${ACCENT})`, boxShadow: `0 8px 28px ${alpha(ACCENT, 0.5)}` },
+            "&.Mui-disabled": { color: "#fff", background: colors["accent-strong"] },
           } },
         // Outlined "inherit": the plain grey button; text "inherit": the same, see-through
         { props: { variant: "outlined", color: "inherit" },
@@ -112,28 +115,13 @@ const options: ThemeOptions = {
         },
         input: {
           height: 38, padding: "0 12px", boxSizing: "border-box",
-          "&::placeholder": { color: "#5d6476", opacity: 1 },
-        },
-      },
-    },
-    MuiTabs: {
-      styleOverrides: {
-        root: { minHeight: 44, borderBottom: "1px solid rgba(255, 255, 255, 0.07)" },
-        indicator: { height: 2, borderRadius: 2 },
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          minHeight: 44, minWidth: 0, padding: "10px 16px", fontSize: 14, color: MUTED,
-          "&.Mui-selected": { color: TEXT },
-          "&.Mui-focusVisible": { outline: `2px solid ${ACCENT}`, outlineOffset: -2, borderRadius: 8 },
+          "&::placeholder": { color: colors.faint, opacity: 1 },
         },
       },
     },
     MuiToggleButtonGroup: {
       styleOverrides: {
-        root: { padding: 3, borderRadius: 12, background: "rgba(0, 0, 0, 0.3)", border: "1px solid rgba(255, 255, 255, 0.07)", gap: 2 },
+        root: { padding: 3, borderRadius: 12, background: "rgba(0, 0, 0, 0.3)", border: `1px solid ${colors.line}`, gap: 2 },
         grouped: { border: "none !important", borderRadius: "9px !important", margin: 0 },
       },
     },
@@ -151,7 +139,7 @@ const options: ThemeOptions = {
     },
     MuiChip: {
       styleOverrides: {
-        root: { height: 26, fontSize: 12, borderRadius: 999, background: SURFACE_2, border: "1px solid rgba(255, 255, 255, 0.07)" },
+        root: { height: 26, fontSize: 12, borderRadius: 999, background: SURFACE_2, border: `1px solid ${colors.line}` },
         label: { paddingLeft: 10, paddingRight: 10 },
         icon: { marginLeft: 10, marginRight: -4 },
       },
@@ -160,18 +148,6 @@ const options: ThemeOptions = {
         style: { color: TEXT, background: alpha(COLORS[key], 0.16), borderColor: alpha(COLORS[key], 0.4) },
       })),
     },
-    MuiDialog: {
-      styleOverrides: {
-        paper: {
-          background: SURFACE_2, backgroundImage: "none", border: `1px solid ${BORDER_STRONG}`,
-          borderRadius: 16, boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6)",
-        },
-      },
-    },
-    MuiDialogTitle: { styleOverrides: { root: { fontSize: 16, fontWeight: 650, padding: "22px 22px 8px" } } },
-    MuiDialogContent: { styleOverrides: { root: { padding: "0 22px", color: MUTED } } },
-    MuiDialogActions: { styleOverrides: { root: { padding: 22, gap: 8, "& > :not(style) ~ :not(style)": { marginLeft: 0 } } } },
-    MuiBackdrop: { styleOverrides: { root: { backgroundColor: "rgba(0, 0, 0, 0.5)" } } },
     MuiAlert: {
       styleOverrides: {
         root: { borderRadius: 12, boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)", alignItems: "center" },

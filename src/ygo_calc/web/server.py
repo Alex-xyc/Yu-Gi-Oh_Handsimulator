@@ -15,7 +15,7 @@ Copyright (c) 2026 Alex-xyc
 import os
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -118,8 +118,9 @@ def load_deck(body: DeckCode):
 
 
 @app.post("/api/stats")
-def stats(body: DeckSetup):
-    return opening_stats(body.pool(), grouped=body.tagged)
+def stats(body: DeckSetup, hand_size: int = Query(5, ge=5, le=6)):
+    """The main page's odds; hand_size 6 gives them going second (the export uses both)."""
+    return opening_stats(body.pool(), hand_size=hand_size, grouped=body.tagged)
 
 
 @app.post("/api/draw")
