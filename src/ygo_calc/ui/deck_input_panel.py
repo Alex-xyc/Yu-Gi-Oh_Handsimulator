@@ -6,7 +6,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from ..paths import user_decklists_dir
+from ..paths import ensure_user_decklists_dir
 from . import theme
 
 
@@ -73,9 +73,7 @@ class DeckInputPanel(ctk.CTkFrame):
 
     def browse_file(self):
         """Browse for a .ydk file"""
-        decklists_path = user_decklists_dir()
-        if not os.path.exists(decklists_path):
-            os.makedirs(decklists_path, exist_ok=True)
+        decklists_path = ensure_user_decklists_dir()
 
         filepath = filedialog.askopenfilename(
             title="Select YDK File",
