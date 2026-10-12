@@ -304,6 +304,8 @@ def load_ydk_code(deck: YuGiOhDeck, ydk_code: str, use_api: bool = True) -> bool
     deck.clear_deck()
     ydk_code = ydk_code.strip()
 
+    global _card_name_cache, _card_image_cache
+
     if ydk_code.startswith("ydke://"):
         print("Detected ydke:// format...")
         try:
@@ -340,6 +342,15 @@ def load_ydk_code(deck: YuGiOhDeck, ydk_code: str, use_api: bool = True) -> bool
 
     if use_api:
         card_database = fetch_multiple_card_names(list(set(card_ids)))
+        # Overwrite the persisted cache so it represents the current deck only.
+        try:
+            names = {str(k): str(v) for k, v in card_database.items()}
+            images = {str(k): str(_card_image_cache.get(k, "")) for k in names.keys()}
+            _card_name_cache = names
+            _card_image_cache = images
+            save_api_cache(names=names, images=images)
+        except Exception:
+            logging.exception("Failed to overwrite API cache for new deck")
     else:
         card_database = {}
 
