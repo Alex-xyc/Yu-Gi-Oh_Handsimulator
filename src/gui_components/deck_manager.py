@@ -8,7 +8,8 @@ import sys
 from tkinter import filedialog, messagebox
 from typing import Dict
 
-from main import fetch_multiple_card_names, parse_ydke_url
+import card_cache
+from main import fetch_multiple_card_names, get_card_image_url, parse_ydke_url
 
 
 def browse_file(app):
@@ -110,6 +111,9 @@ def load_deck(app, ydk_code: str):
             card_name = card_database.get(card_id, f"Card_{card_id}")
             card_counts[card_name] = card_counts.get(card_name, 0) + 1
             app.card_id_map[card_name] = card_id
+
+        # Save every card image in the deck to disk now, so drawing hands never waits on the API
+        card_cache.prefetch_images(get_card_image_url(cid) for cid in set(card_ids))
 
         # Add to deck
         for card_name, copies in card_counts.items():

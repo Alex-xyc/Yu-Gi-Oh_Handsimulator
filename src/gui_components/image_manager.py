@@ -5,8 +5,9 @@ and resize existing thumbnails responsively.
 """
 from io import BytesIO
 from typing import Any, Optional, Tuple
-import urllib.request
 import logging
+
+import card_cache
 
 try:
     from PIL import Image, ImageTk
@@ -19,15 +20,14 @@ import tkinter as tk
 
 
 def _download_image(url: str) -> Optional[Image.Image]:
+    """Load an image from the on-disk cache, downloading it on first use."""
     try:
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
-        with urllib.request.urlopen(req, timeout=10) as response:
-            image_data = response.read()
-        img = Image.open(BytesIO(image_data)).convert("RGBA")
-        return img
+        image_data = card_cache.get_image_bytes(url)
+        if image_data is None:
+            return None
+        return Image.open(BytesIO(image_data)).convert("RGBA")
     except Exception:
-        logging.exception("Failed to download image: %s", url)
+        logging.exception("Failed to load image: %s", url)
         return None
 
 

@@ -10,6 +10,7 @@ Copyright (c) 2026 Alex-xyc
 import random
 import base64
 import struct
+import urllib.error
 import urllib.request
 import json
 import os
@@ -17,6 +18,9 @@ import html
 from math import comb
 from typing import Dict, List, Tuple
 import logging
+import time
+
+import card_cache
 
 
 class YuGiOhDeck:
@@ -32,6 +36,39 @@ class YuGiOhDeck:
         self.engine_cards: set = set()
         self.non_engine_cards: set = set()
         self.brick_cards: set = set()
+        # Counts entered by the user; these drive the probability math
+        self.engine_count = 0
+        self.non_engine_count = 0
+        self.brick_count = 0
+
+    def assign_categories(self, brick_count: int, non_engine_count: int, engine_count: int) -> None:
+        """Record category counts and tag card names to approximate them.
+
+        Names are tagged greedily so drawn hands can be labelled. Cards that
+        don't fit are skipped (without consuming the count), so e.g. 4 bricks
+        can be filled by a 3-of plus a 1-of further down the list.
+        """
+        self.brick_count = brick_count
+        self.non_engine_count = non_engine_count
+        self.engine_count = engine_count
+
+        self.engine_cards.clear()
+        self.non_engine_cards.clear()
+        self.brick_cards.clear()
+
+        for target, count in ((self.brick_cards, brick_count),
+                              (self.non_engine_cards, non_engine_count),
+                              (self.engine_cards, engine_count)):
+            remaining = count
+            for card_name, copies in self.cards.items():
+                if remaining <= 0:
+                    break
+                if card_name in self.brick_cards or card_name in self.non_engine_cards \
+                        or card_name in self.engine_cards:
+                    continue
+                if copies <= remaining:
+                    target.add(card_name)
+                    remaining -= copies
 
     def add_card(self, card_name: str, copies: int) -> None:
         if copies < 1 or copies > self.MAX_COPIES:
@@ -46,6 +83,9 @@ class YuGiOhDeck:
         self.engine_cards.clear()
         self.non_engine_cards.clear()
         self.brick_cards.clear()
+        self.engine_count = 0
+        self.non_engine_count = 0
+        self.brick_count = 0
 
     def get_deck_list(self) -> List[str]:
         deck = []
@@ -60,151 +100,162 @@ _card_name_cache: Dict[str, str] = {}
 _card_image_cache: Dict[str, str] = {}
 
 
-def _get_api_cache_path() -> str:
-    """Return path to the local API cache file."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    cache_dir = os.path.join(script_dir, "cache")
-    try:
-        os.makedirs(cache_dir, exist_ok=True)
-    except Exception:
-        pass
-    return os.path.join(cache_dir, "deck_api_cache.json")
+def _request_cards(ids: List[str], timeout: int) -> List[Dict]:
+    """Query the YGOPRODeck API for the given (normalized) card ids."""
+    url = f"https://db.ygoprodeck.com/api/v7/cardinfo.php?id={','.join(ids)}"
+    req = urllib.request.Request(url)
+    req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
+    req.add_header('Accept', 'application/json')
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        data = json.loads(response.read().decode())
+    return data.get('data', [])
 
 
-def load_api_cache() -> None:
-    """Load cached API responses from disk into module-level caches."""
-    global _card_name_cache, _card_image_cache
-    path = _get_api_cache_path()
-    if not os.path.exists(path):
-        return
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            names = data.get("names", {}) or {}
-            images = data.get("images", {}) or {}
-            # replace existing small caches with persisted data
-            _card_name_cache = {str(k): str(v) for k, v in names.items()}
-            _card_image_cache = {str(k): str(v) for k, v in images.items()}
-    except Exception:
-        logging.exception("Failed to load API cache")
+def _remember_card(card_id: str, name: str, image_url: str) -> None:
+    _card_name_cache[card_id] = name
+    if image_url:
+        _card_image_cache[card_id] = image_url
 
 
-def save_api_cache(names: Dict[str, str] = None, images: Dict[str, str] = None) -> None:
-    """Save provided or current caches to disk (overwrites existing cache).
-
-    This is used to persist the API responses for the current deck so future
-    runs do not need to re-query the remote API repeatedly.
-    """
-    global _card_name_cache, _card_image_cache
-    path = _get_api_cache_path()
-    try:
-        payload = {
-            "names": names if names is not None else _card_name_cache,
-            "images": images if images is not None else _card_image_cache,
-        }
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-    except Exception:
-        logging.exception("Failed to save API cache")
-
-
-# Try loading any existing cache on import so repeated runs reuse it until
-# the user imports a new deck (which will overwrite the cache).
-load_api_cache()
+def _remember_api_cards(cards: List[Dict], wanted: Dict[str, List[str]], result: Dict[str, str]) -> None:
+    """Store API results under every requested id (incl. leading-zero / alt-art ids)."""
+    for card in cards:
+        name = html.unescape(card['name'])
+        images = card.get('card_images') or []
+        main_image = images[0].get('image_url_small', '') if images else ''
+        art_ids = {str(card['id']): main_image}
+        for art in images:
+            art_ids.setdefault(str(art.get('id', '')), art.get('image_url_small', ''))
+        for norm_id, image_url in art_ids.items():
+            for original_id in wanted.get(norm_id, []):
+                _remember_card(original_id, name, image_url or main_image)
+                result[original_id] = name
 
 
 def fetch_card_name(card_id: str) -> str:
-    """Fetch card name from YGOPRODeck API."""
-    global _card_name_cache, _card_image_cache
-
+    """Fetch card name, using the local card database before the API."""
     if card_id in _card_name_cache:
         return _card_name_cache[card_id]
 
-    try:
-        url = f"https://db.ygoprodeck.com/api/v7/cardinfo.php?id={card_id}"
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
-        req.add_header('Accept', 'application/json')
+    entry = card_cache.lookup(card_id)
+    if entry:
+        _remember_card(card_id, entry['name'], entry['image'])
+        return entry['name']
 
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode())
-            if 'data' in data and len(data['data']) > 0:
-                card_data = data['data'][0]
-                card_name = html.unescape(card_data['name'])
-                _card_name_cache[card_id] = card_name
-                # Cache image URL
-                if 'card_images' in card_data and len(card_data['card_images']) > 0:
-                    _card_image_cache[card_id] = card_data['card_images'][0].get('image_url_small', '')
-                return card_name
+    try:
+        norm_id = card_cache.normalize_id(card_id)
+        result: Dict[str, str] = {}
+        _remember_api_cards(_request_cards([norm_id], timeout=10), {norm_id: [card_id]}, result)
+        if card_id in result:
+            return result[card_id]
+    except urllib.error.HTTPError as e:
+        logging.warning("Card id %s not found (HTTP %s)", card_id, e.code)
     except Exception:
         logging.exception("Failed to fetch card name for id %s", card_id)
 
     return f"Unknown_{card_id}"
 
 
-def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict[str, str]:
-    """Fetch multiple card names from API."""
-    global _card_name_cache, _card_image_cache
-    result = {}
-
-    # Ensure we have the latest persisted cache loaded
-    try:
-        load_api_cache()
-    except Exception:
-        pass
-
-    uncached_ids = [cid for cid in card_ids if cid not in _card_name_cache]
-
+def _resolve_with_fallback(card_ids: List[str], result: Dict[str, str]) -> None:
+    """Resolve ids YGOPRODeck doesn't list (alt arts, tokens, new cards) via EDOPro's database."""
     for cid in card_ids:
-        if cid in _card_name_cache:
-            result[cid] = _card_name_cache[cid]
+        if cid in result:
+            continue
+        entry = card_cache.lookup_fallback(cid)
+        if entry:
+            _remember_card(cid, entry['name'], entry['image'])
+            result[cid] = entry['name']
+        else:
+            logging.warning("Card id %s not found in YGOPRODeck or EDOPro databases", cid)
+            result[cid] = f"Card_{cid}"
 
+
+def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict[str, str]:
+    """Fetch multiple card names: memory cache -> local card database -> API -> EDOPro fallback."""
+    result = {cid: _card_name_cache[cid] for cid in card_ids if cid in _card_name_cache}
+
+    db = card_cache.get_db_nowait()
+    for cid in card_ids:
+        if cid not in result:
+            entry = card_cache.lookup(cid)
+            if entry:
+                _remember_card(cid, entry['name'], entry['image'])
+                result[cid] = entry['name']
+
+    uncached_ids = [cid for cid in card_ids if cid not in result]
     if not uncached_ids:
         if verbose:
             print("All cards found in cache.")
         return result
 
+    if db is not None:
+        # The local copy of YGOPRODeck is complete, so asking its API again won't help
+        _resolve_with_fallback(uncached_ids, result)
+        return result
+
     if verbose:
         print(f"Fetching {len(uncached_ids)} card names from API...")
 
-    try:
-        ids_param = ",".join(uncached_ids)
-        url = f"https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids_param}"
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
-        req.add_header('Accept', 'application/json')
+    # The API drops leading zeros and answers alt-art ids with the main id,
+    # so map each normalized id back to the id(s) the deck actually used.
+    wanted: Dict[str, List[str]] = {}
+    for cid in uncached_ids:
+        wanted.setdefault(card_cache.normalize_id(cid), []).append(cid)
 
-        with urllib.request.urlopen(req, timeout=20) as response:
-            data = json.loads(response.read().decode())
-            if 'data' in data:
-                for card in data['data']:
-                    card_id = str(card['id'])
-                    card_name = html.unescape(card['name'])
-                    _card_name_cache[card_id] = card_name
-                    result[card_id] = card_name
-                    # Cache image URL
-                    if 'card_images' in card and len(card['card_images']) > 0:
-                        _card_image_cache[card_id] = card['card_images'][0].get('image_url_small', '')
-                if verbose:
-                    print(f"  Loaded {len(data['data'])} cards.")
-            # Persist the freshly fetched API responses so subsequent runs reuse them.
-            try:
-                save_api_cache()
-            except Exception:
-                pass
+    try:
+        cards = _request_cards(list(wanted), timeout=20)
+        _remember_api_cards(cards, wanted, result)
+        if verbose:
+            print(f"  Loaded {len(cards)} cards.")
+    except urllib.error.HTTPError:
+        # The API rejects the whole batch if any single id is unknown
+        logging.warning("Batch card lookup rejected; retrying ids individually")
     except Exception:
         logging.exception("Failed to fetch multiple card names from API")
         for card_id in uncached_ids:
-            # fallback: leave uncached
             result[card_id] = f"Card_{card_id}"
+        return result
 
-        import time
-        for card_id in uncached_ids:
-            if card_id not in result:
-                name = fetch_card_name(card_id)
+    # Some ids were not matched by the batch: try them one at a time
+    for card_id in uncached_ids:
+        if card_id not in result:
+            time.sleep(0.1)
+            name = fetch_card_name(card_id)
+            if not name.startswith("Unknown_"):
                 result[card_id] = name
-                _card_name_cache[card_id] = name
-                time.sleep(0.1)
+
+    _resolve_with_fallback(uncached_ids, result)
+    return result
+
+    if verbose:
+        print(f"Fetching {len(uncached_ids)} card names from API...")
+
+    # The API drops leading zeros and answers alt-art ids with the main id,
+    # so map each normalized id back to the id(s) the deck actually used.
+    wanted: Dict[str, List[str]] = {}
+    for cid in uncached_ids:
+        wanted.setdefault(card_cache.normalize_id(cid), []).append(cid)
+
+    try:
+        cards = _request_cards(list(wanted), timeout=20)
+        _remember_api_cards(cards, wanted, result)
+        if verbose:
+            print(f"  Loaded {len(cards)} cards.")
+    except urllib.error.HTTPError:
+        # The API rejects the whole batch if any single id is unknown
+        logging.warning("Batch card lookup rejected; retrying ids individually")
+    except Exception:
+        logging.exception("Failed to fetch multiple card names from API")
+        for card_id in uncached_ids:
+            result[card_id] = f"Card_{card_id}"
+        return result
+
+    # Some ids were not matched by the batch: try them one at a time
+    for card_id in uncached_ids:
+        if card_id not in result:
+            time.sleep(0.1)
+            name = fetch_card_name(card_id)
+            result[card_id] = name if not name.startswith("Unknown_") else f"Card_{card_id}"
 
     return result
 
@@ -350,6 +401,34 @@ def probability_at_least(population: int, successes_in_pop: int,
     return prob
 
 
+def format_probability_tables(deck_size: int, engine_count: int, non_engine_count: int,
+                              brick_count: int, hand_size: int = 5) -> str:
+    """Build 'at least' and 'exactly' tables for every count 0..hand_size."""
+    rows = [("Engine", engine_count), ("Non-Engine", non_engine_count), ("Brick", brick_count)]
+    lines = []
+
+    lines.append(f"'At Least' Probabilities (X or more in {hand_size} cards):")
+    lines.append("")
+    lines.append(f"{'':<12}" + "".join(f"{str(k) + '+':>8}" for k in range(1, hand_size + 1)))
+    lines.append("-" * (12 + 8 * hand_size))
+    for label, count in rows:
+        cells = "".join(f"{probability_at_least(deck_size, count, hand_size, k) * 100:>7.1f}%"
+                        for k in range(1, hand_size + 1))
+        lines.append(f"{label:<12}{cells}")
+
+    lines.append("")
+    lines.append(f"Exact Probabilities (EXACTLY X in {hand_size} cards):")
+    lines.append("")
+    lines.append(f"{'':<12}" + "".join(f"{k:>7}" for k in range(hand_size + 1)))
+    lines.append("-" * (12 + 7 * (hand_size + 1)))
+    for label, count in rows:
+        cells = "".join(f"{hypergeometric_probability(deck_size, count, hand_size, k) * 100:>6.1f}%"
+                        for k in range(hand_size + 1))
+        lines.append(f"{label:<12}{cells}")
+
+    return "\n".join(lines) + "\n"
+
+
 def draw_test_hand(deck: YuGiOhDeck, hand_size: int = 5) -> List[str]:
     """Draw a random test hand."""
     full_deck = deck.get_deck_list()
@@ -371,9 +450,9 @@ def analyze_hand(deck: YuGiOhDeck, hand: List[str]) -> Dict:
 def calculate_probabilities(deck: YuGiOhDeck, hand_size: int = 5) -> Dict:
     """Calculate all probabilities for the deck."""
     deck_size = deck.get_deck_size()
-    engine_count = sum(deck.cards[c] for c in deck.engine_cards)
-    non_engine_count = sum(deck.cards[c] for c in deck.non_engine_cards)
-    brick_count = sum(deck.cards[c] for c in deck.brick_cards)
+    engine_count = deck.engine_count
+    non_engine_count = deck.non_engine_count
+    brick_count = deck.brick_count
 
     probs = {
         'deck_size': deck_size,
@@ -422,13 +501,9 @@ def calculate_6th_card_odds(deck: YuGiOhDeck, hand: List[str]) -> Dict:
     non_engine_in_hand = sum(1 for c in hand if c in deck.non_engine_cards)
     brick_in_hand = sum(1 for c in hand if c in deck.brick_cards)
 
-    engine_total = sum(deck.cards[c] for c in deck.engine_cards)
-    non_engine_total = sum(deck.cards[c] for c in deck.non_engine_cards)
-    brick_total = sum(deck.cards[c] for c in deck.brick_cards)
-
-    engine_remaining = engine_total - engine_in_hand
-    non_engine_remaining = non_engine_total - non_engine_in_hand
-    brick_remaining = brick_total - brick_in_hand
+    engine_remaining = max(deck.engine_count - engine_in_hand, 0)
+    non_engine_remaining = max(deck.non_engine_count - non_engine_in_hand, 0)
+    brick_remaining = max(deck.brick_count - brick_in_hand, 0)
 
     return {
         'remaining_deck': remaining_deck,
@@ -517,21 +592,9 @@ def display_results(deck: YuGiOhDeck, hand: List[str], probs: Dict) -> None:
                 print(f"    -    ", end="")
         print()
 
-    print("\n'At Least' Probabilities (chance of drawing X OR MORE of a category):")
-    print(f"  At least 1 engine:      {probs['engine_at_least'].get(1, 0)*100:.1f}%")
-    print(f"  At least 2 engine:      {probs['engine_at_least'].get(2, 0)*100:.1f}%")
-    print(f"  At least 1 non-engine:  {probs['non_engine_at_least'].get(1, 0)*100:.1f}%")
-    print(f"  At least 2 non-engine:  {probs['non_engine_at_least'].get(2, 0)*100:.1f}%")
-    print(f"  At least 1 brick:       {probs['brick_at_least'].get(1, 0)*100:.1f}%")
-    print(f"  At least 2 brick:       {probs['brick_at_least'].get(2, 0)*100:.1f}%")
-
-    print("\nExact Count Probabilities (chance of drawing EXACTLY X of a category):")
-    print(f"  Exactly 0 engine:       {probs['engine_probs'].get(0, 0)*100:.1f}%")
-    print(f"  Exactly 1 engine:       {probs['engine_probs'].get(1, 0)*100:.1f}%")
-    print(f"  Exactly 2 engine:       {probs['engine_probs'].get(2, 0)*100:.1f}%")
-    print(f"  Exactly 0 brick:        {probs['brick_probs'].get(0, 0)*100:.1f}%")
-    print(f"  Exactly 1 brick:        {probs['brick_probs'].get(1, 0)*100:.1f}%")
-    print(f"  Exactly 2 brick:        {probs['brick_probs'].get(2, 0)*100:.1f}%")
+    print()
+    print(format_probability_tables(probs['deck_size'], probs['engine_total'],
+                                    probs['non_engine_total'], probs['brick_total']), end="")
 
     # Brick danger zone
     print("\n" + "-" * 60)
@@ -697,42 +760,7 @@ def run_simulator():
             except ValueError:
                 print("Enter a valid number.")
 
-        # Assign categories
-        card_list = list(deck.cards.keys())
-        deck.engine_cards.clear()
-        deck.non_engine_cards.clear()
-        deck.brick_cards.clear()
-
-        remaining = engine_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            copies = deck.cards[card_name]
-            if copies <= remaining:
-                deck.engine_cards.add(card_name)
-            remaining -= copies
-
-        remaining = non_engine_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            if card_name in deck.engine_cards:
-                continue
-            copies = deck.cards[card_name]
-            if copies <= remaining:
-                deck.non_engine_cards.add(card_name)
-            remaining -= copies
-
-        remaining = brick_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            if card_name in deck.engine_cards or card_name in deck.non_engine_cards:
-                continue
-            copies = deck.cards[card_name]
-            if copies <= remaining:
-                deck.brick_cards.add(card_name)
-            remaining -= copies
+        deck.assign_categories(brick_count, non_engine_count, engine_count)
 
         print(f"\nDeck configured: {engine_count} engine, {non_engine_count} non-engine, {brick_count} bricks")
 

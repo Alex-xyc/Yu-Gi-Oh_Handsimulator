@@ -24,6 +24,12 @@ python -m pip install -r requirements.txt
 python src/gui.py
 ```
 
+Privacy & data
+
+- The app has no accounts, analytics, tracking or telemetry, and does not collect or send any personal data.
+- Your decklists stay on your computer. The only network requests go over HTTPS to the public [YGOPRODeck API](https://ygoprodeck.com/api-guide/) (`db.ygoprodeck.com` and `images.ygoprodeck.com`) to fetch card names and images. As with any web request, YGOPRODeck can see your IP address; see their privacy policy.
+- Card data and the images for decks you load are cached locally in `%LOCALAPPDATA%\YGO-Hand-Simulator` (Windows) or `~/.cache/ygo-hand-simulator` (macOS/Linux). Delete that folder at any time to remove all cached data; it is re-downloaded when needed. Set the `YGO_CACHE_DIR` environment variable to use a different location.
+
 Notes
 
 - The project is licensed under the MIT License — see the `LICENSE` file.

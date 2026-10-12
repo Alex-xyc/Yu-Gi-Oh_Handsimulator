@@ -5,7 +5,6 @@ draw simulated opening hands, and display probability statistics.
 
 Copyright (c) 2026 Alex-xyc
 """
-
 import sys
 import ctypes
 import logging
@@ -75,6 +74,7 @@ except Exception:
     iconmgr = None
 
 
+import card_cache
 from main import YuGiOhDeck
 
 
@@ -123,6 +123,9 @@ class YuGiOhHandSimulator(ctk.CTk):
         # Expose component references on the instance
         self.imagemgr = imagemgr
         self.statsmgr = statsmgr
+
+        # Download/refresh the local card database without blocking the UI
+        card_cache.preload_in_background()
 
         # Create UI
         self.create_widgets()
@@ -239,15 +242,15 @@ class YuGiOhHandSimulator(ctk.CTk):
                 container.grid_columnconfigure(2, weight=1)
 
                 try:
-                    import gui_components.hand_manager as handmgr
-                    hand_frame = handmgr.create_hand_section(self, container)
+                    from gui_components.hand_manager import create_hand_section
+                    hand_frame = create_hand_section(self, container)
                 except Exception:
                     hand_frame = ctk.CTkFrame(container, fg_color="#2b2b2b")
                     hand_frame.grid(row=0, column=0, sticky="nsew", padx=(6, 2), pady=6)
 
                 try:
-                    import gui_components.stats_ui as statsui
-                    stats_frame = statsui.create_stats_section(self, container)
+                    from gui_components.stats_ui import create_stats_section
+                    stats_frame = create_stats_section(self, container)
                 except Exception:
                     stats_frame = ctk.CTkFrame(container, fg_color="#2b2b2b")
                     stats_frame.grid(row=0, column=2, sticky="nsew", padx=(2, 6), pady=6)
@@ -265,15 +268,15 @@ class YuGiOhHandSimulator(ctk.CTk):
                     container.grid_columnconfigure(2, weight=1)
 
                     try:
-                        import gui_components.hand_manager as handmgr
-                        hand_frame = handmgr.create_hand_section(self, container)
+                        from gui_components.hand_manager import create_hand_section
+                        hand_frame = create_hand_section(self, container)
                     except Exception:
                         hand_frame = ctk.CTkFrame(container, fg_color="#2b2b2b")
                         hand_frame.grid(row=0, column=0, sticky="nsew", padx=(6, 2), pady=6)
 
                     try:
-                        import gui_components.stats_ui as statsui
-                        stats_frame = statsui.create_stats_section(self, container)
+                        from gui_components.stats_ui import create_stats_section
+                        stats_frame = create_stats_section(self, container)
                     except Exception:
                         stats_frame = ctk.CTkFrame(container, fg_color="#2b2b2b")
                         stats_frame.grid(row=0, column=2, sticky="nsew", padx=(2, 6), pady=6)
