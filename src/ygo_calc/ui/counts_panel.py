@@ -10,8 +10,10 @@ from ..core.categories import BRICK, ENGINE, NON_ENGINE, UNTAGGED
 class CountsPanel(ctk.CTkFrame):
     """Count entries plus the "Apply & Draw Hand" and "Show Decklist" buttons."""
 
-    def __init__(self, master, on_apply: Callable[[], None], on_show_decklist: Callable[[], None]):
+    def __init__(self, master, on_apply: Callable[[], None], on_show_decklist: Callable[[], None],
+                 on_locked_click: Callable[[ctk.CTkEntry], None]):
         super().__init__(master)
+        self.on_locked_click = on_locked_click
         # Create extra columns so we can center the inputs on wide screens
         for i in range(9):
             self.grid_columnconfigure(i, weight=0)
@@ -59,8 +61,13 @@ class CountsPanel(ctk.CTkFrame):
         label.grid(row=2, column=column, padx=(10, 5), pady=10)
         entry = ctk.CTkEntry(self, width=80, placeholder_text="0", font=ctk.CTkFont(size=14))
         entry.grid(row=2, column=column + 1, padx=5, pady=10)
-        entry.insert(0, "0")
+        entry.bind("<Button-1>", lambda _e: self._on_entry_click(entry))
         return entry
+
+    def _on_entry_click(self, entry: ctk.CTkEntry):
+        # Entries are only locked while decklist tags are in use
+        if entry.cget("state") == "disabled":
+            self.on_locked_click(entry)
 
     def get_counts(self) -> Tuple[int, int, int]:
         """(bricks, non-engine, engine) as typed; raises ValueError for non-numbers."""
@@ -81,14 +88,22 @@ class CountsPanel(ctk.CTkFrame):
             entry.configure(state="normal")
             if tags is not None:
                 entry.delete(0, "end")
-                entry.insert(0, str(tags.count(key)))
+                if tags.count(key):  # Leave 0 empty so it shows the greyed-out placeholder
+                    entry.insert(0, str(tags.count(key)))
                 entry.configure(state="disabled")
+
+    def reset_counts(self) -> None:
+        """Empty every count entry (an empty entry shows the greyed-out 0 and counts as 0)."""
+        for entry in self._entries.values():
+            entry.configure(state="normal")
+            entry.delete(0, "end")
 
     def show_deck_loaded(self, deck_size: int, tags: Optional[List[str]]) -> None:
         text = f"✓ Deck loaded: {deck_size} cards"
         if tags is not None:
-            text += "  |  Using tags from Advanced view"
+            text += "  |  Using decklist tags"
             untagged = tags.count(UNTAGGED)
             if untagged:
                 text += f" ({untagged} untagged)"
+            text += " - click a count to switch to typed counts"
         self.set_status(text, "lightgreen")

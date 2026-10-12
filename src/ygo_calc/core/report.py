@@ -1,6 +1,6 @@
 """The "Probabilities & Statistics" text shown next to the test hand."""
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .categories import BRICK, ENGINE, NON_ENGINE, UNTAGGED, CardPool
 from .probability import (engine_non_engine_probability, hypergeometric_probability,
@@ -8,11 +8,12 @@ from .probability import (engine_non_engine_probability, hypergeometric_probabil
 
 
 def format_statistics_report(deck_size: int, counts: Dict[str, int],
-                             hand_categories: List[str], hand_size: int = 5) -> str:
+                             hand_categories: Optional[List[str]], hand_size: int = 5) -> str:
     """Opening-hand odds, brick analysis and 6th-card odds for the current hand.
 
     counts: copies per category (see categories.count_categories).
-    hand_categories: the category of each card in the drawn hand.
+    hand_categories: the category of each card in the drawn hand, or None when cards
+        aren't tagged by name (typed counts), which leaves out the 6th-card odds.
     """
     engine_count = counts[ENGINE]
     non_engine_count = counts[NON_ENGINE]
@@ -81,6 +82,11 @@ def format_statistics_report(deck_size: int, counts: Dict[str, int],
     out.append("\n" + "-" * 50 + "\n")
     out.append("6TH CARD ODDS (based on current hand)\n\n")
 
+    if hand_categories is None:
+        out.append("  Tag your cards in the decklist to see these:\n"
+                   "  typed counts don't say which cards are in your hand.\n")
+        return "".join(out)
+
     remaining_deck = deck_size - 5
     engine_remaining = engine_count - hand_categories.count(ENGINE)
     non_engine_remaining = non_engine_count - hand_categories.count(NON_ENGINE)
@@ -98,11 +104,13 @@ _CARD_ODDS_GROUPS = [(ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Br
                      ("mixed", "Mixed tags"), (UNTAGGED, "Untagged")]
 
 
-def format_card_odds(pool: CardPool, deck_size: int, hand_size: int = 5) -> str:
+def format_card_odds(pool: CardPool, deck_size: int, hand_size: int = 5,
+                     grouped: bool = True) -> str:
     """Chance of opening with at least one copy of each card, going first (hand_size
     cards) and going second (hand_size + 1), grouped by the card's category.
 
-    A card whose copies have different tags is listed under "Mixed tags".
+    A card whose copies have different tags is listed under "Mixed tags". With
+    grouped=False (categories not chosen by name) every card is listed in one group.
     """
     copies: Dict[str, int] = {}
     categories: Dict[str, set] = {}
@@ -112,7 +120,7 @@ def format_card_odds(pool: CardPool, deck_size: int, hand_size: int = 5) -> str:
 
     groups: Dict[str, List[str]] = {key: [] for key, _ in _CARD_ODDS_GROUPS}
     for card_name in copies:  # deck order
-        cats = categories[card_name]
+        cats = categories[card_name] if grouped else {UNTAGGED}
         groups[next(iter(cats)) if len(cats) == 1 else "mixed"].append(card_name)
 
     out: List[str] = []
@@ -122,7 +130,7 @@ def format_card_odds(pool: CardPool, deck_size: int, hand_size: int = 5) -> str:
     for key, title in _CARD_ODDS_GROUPS:
         if not groups[key]:
             continue
-        out.append(f"\n  {title}:\n")
+        out.append(f"\n  {title}:\n" if grouped else "\n")
         for card_name in groups[key]:
             n = copies[card_name]
             first = probability_at_least(deck_size, n, hand_size, 1) * 100

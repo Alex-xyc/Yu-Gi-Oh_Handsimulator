@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 import customtkinter as ctk
 
 from ..cards import fetch_multiple_card_names, get_card_image_urls
-from ..core.categories import (CardPool, count_categories, pool_from_category_sets, pool_from_counts,
+from ..core.categories import (BRICK, ENGINE, NON_ENGINE, CardPool, count_categories, pool_from_category_sets, pool_from_counts,
                                pool_from_tags, sync_category_sets)
 from ..core.deck import YuGiOhDeck
 from ..core.deck_builder import TooManyCopiesError, count_cards, fill_deck
@@ -85,7 +85,8 @@ class YuGiOhHandSimulator(ctk.CTk):
 
         # MIDDLE SECTION: Card Counts
         self.counts_panel = CountsPanel(self, on_apply=self.apply_and_draw,
-                                        on_show_decklist=self.open_advanced_view)
+                                        on_show_decklist=self.open_advanced_view,
+                                        on_locked_click=self.switch_to_typed_counts)
         self.counts_panel.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
         # BOTTOM SECTION: test hand and statistics, side by side with a draggable divider
@@ -144,6 +145,27 @@ class YuGiOhHandSimulator(ctk.CTk):
         if self.deck_loaded:
             self.counts_panel.show_deck_loaded(self.deck.get_deck_size(), self.manual_tags)
 
+    def switch_to_typed_counts(self, entry: ctk.CTkEntry):
+        """After confirmation, drop the decklist tags and unlock the count entries.
+
+        The entries keep the tagged totals as a starting point. Which cards fill each
+        category can't be known from counts alone, so they're assigned in deck-list order.
+        """
+        if self.manual_tags is None:
+            return
+        if not messagebox.askyesno(
+                "Switch to typed counts?",
+                "This removes your decklist tags. The counts will start from your current "
+                "totals, but cards will no longer be assigned to categories by name.\n\n"
+                "Switch to typed counts?"):
+            return
+        totals = [self.manual_tags.count(key) for key in (BRICK, NON_ENGINE, ENGINE)]
+        self._set_manual_tags(None)
+        self.card_pool = pool_from_counts(self.deck, *totals)
+        sync_category_sets(self.deck, self.card_pool)
+        entry.focus_set()
+        entry.select_range(0, "end")
+
     def apply_and_draw(self):
         """Apply card counts and draw a hand"""
         if not self.deck_loaded:
@@ -191,8 +213,12 @@ class YuGiOhHandSimulator(ctk.CTk):
         """Calculate and display probability statistics"""
         pool = self.card_pool or pool_from_category_sets(self.deck)
         deck_size = self.deck.get_deck_size()
-        report = format_statistics_report(deck_size, count_categories(pool), self.current_hand_categories)
-        report += format_card_odds(pool, deck_size)
+        # With typed counts, which cards fill each category is arbitrary (deck-list order),
+        # so leave out everything that depends on a specific card's category
+        tagged = self.manual_tags is not None
+        report = format_statistics_report(deck_size, count_categories(pool),
+                                          self.current_hand_categories if tagged else None)
+        report += format_card_odds(pool, deck_size, grouped=tagged)
         self.stats_panel.show_text(report)
 
     # "Show Decklist" (Advanced view)
@@ -234,9 +260,11 @@ class YuGiOhHandSimulator(ctk.CTk):
             self.advanced_view = None
 
         self._set_manual_tags(tags)
-        if self.manual_tags is not None:
-            self.card_pool = pool_from_tags(self.deck, self.manual_tags)
-            sync_category_sets(self.deck, self.card_pool)
+        # With every tag cleared, this pool is all untagged, which wipes the old categories
+        self.card_pool = pool_from_tags(self.deck, self.manual_tags or tags)
+        sync_category_sets(self.deck, self.card_pool)
+        if self.manual_tags is None:
+            self.counts_panel.reset_counts()
 
 
 def main():
