@@ -73,6 +73,7 @@ class AdvancedDeckView(ctk.CTkFrame):
         self.tiles: List[tk.Label] = []
         self._image_queue: "queue.Queue" = queue.Queue()
         self._closed = False
+        self._history: List[List[str]] = []  # Tag snapshots taken before each change, for undo
 
         self.tool = ctk.StringVar(value=BRICK)
         self.all_copies = ctk.BooleanVar(value=True)
@@ -81,6 +82,9 @@ class AdvancedDeckView(ctk.CTkFrame):
         self._layout_tiles()
         self._refresh_all()
         self._start_image_loading()
+
+        # Ctrl+Z undoes the last tagging action while this view is open
+        self._undo_binding = self.winfo_toplevel().bind("<Control-z>", lambda _e: self.undo(), add="+")
 
     # Sizing (all in physical pixels, matching winfo sizes and image pixels)
 
@@ -146,11 +150,14 @@ class AdvancedDeckView(ctk.CTkFrame):
         self.counts_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=14))
         self.counts_label.grid(row=0, column=1, padx=10)
 
+        self.undo_button = ctk.CTkButton(header, text="Undo", width=90, fg_color="gray35",
+                                         hover_color="gray25", command=self.undo)
+        self.undo_button.grid(row=0, column=2, padx=5)
         ctk.CTkButton(header, text="Clear All Tags", width=120, fg_color="gray35",
-                      hover_color="gray25", command=self.clear_tags).grid(row=0, column=2, padx=5)
+                      hover_color="gray25", command=self.clear_tags).grid(row=0, column=3, padx=5)
         ctk.CTkButton(header, text="Done", width=120, fg_color="green", hover_color="darkgreen",
                       font=ctk.CTkFont(size=14, weight="bold"),
-                      command=self.finish).grid(row=0, column=3, padx=(5, 0))
+                      command=self.finish).grid(row=0, column=4, padx=(5, 0))
 
         # Toolbar: which tag a click applies
         toolbar = ctk.CTkFrame(self, fg_color="transparent")
@@ -212,6 +219,9 @@ class AdvancedDeckView(ctk.CTkFrame):
             indices = [i for i, name in enumerate(self.deck_list) if name == card_name]
         else:
             indices = [index]
+        if all(self.tags[i] == tag for i in indices):
+            return
+        self._save_undo()
         for i in indices:
             self.tags[i] = tag
             self._render_tile(i)
@@ -219,6 +229,9 @@ class AdvancedDeckView(ctk.CTkFrame):
 
     def tag_untagged(self, tag: str):
         """Give every still-untagged copy the given tag."""
+        if UNTAG not in self.tags:
+            return
+        self._save_undo()
         for i, current in enumerate(self.tags):
             if current == UNTAG:
                 self.tags[i] = tag
@@ -226,8 +239,25 @@ class AdvancedDeckView(ctk.CTkFrame):
         self._update_counts()
 
     def clear_tags(self):
+        if all(tag == UNTAG for tag in self.tags):
+            return
+        self._save_undo()
         self.tags = [UNTAG] * len(self.deck_list)
         self._refresh_all()
+
+    def undo(self):
+        """Restore the tags from before the last tagging action."""
+        if not self._history:
+            return
+        previous = self._history.pop()
+        changed = [i for i, (old, new) in enumerate(zip(previous, self.tags)) if old != new]
+        self.tags = previous
+        for i in changed:
+            self._render_tile(i)
+        self._update_counts()
+
+    def _save_undo(self):
+        self._history.append(list(self.tags))
 
     def finish(self):
         self._closed = True
@@ -235,6 +265,10 @@ class AdvancedDeckView(ctk.CTkFrame):
 
     def destroy(self):
         self._closed = True
+        try:
+            self.winfo_toplevel().unbind("<Control-z>", self._undo_binding)
+        except (AttributeError, tk.TclError):
+            pass
         super().destroy()
 
     def _update_counts(self):
@@ -249,6 +283,7 @@ class AdvancedDeckView(ctk.CTkFrame):
             colour = TAGS[key][1] if untagged else "gray30"
             button.configure(state="normal" if untagged else "disabled",
                              fg_color=colour, hover_color=colour)
+        self.undo_button.configure(state="normal" if self._history else "disabled")
 
     # Rendering
 
