@@ -1,0 +1,170 @@
+// Small building blocks shared across the app
+
+import Alert from "@mui/material/Alert";
+import CircularProgress from "@mui/material/CircularProgress";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import { AnimatePresence, motion, Variants } from "framer-motion";
+import { ReactNode, useEffect, useLayoutEffect, useState } from "react";
+import { cardImageUrl } from "../api";
+
+/** A card picture, or its name on a plain tile when there's no image. */
+export function CardImage({ id, name, size = "small", className = "" }: {
+  id?: string; name: string; size?: "small" | "full"; className?: string;
+}) {
+  const url = cardImageUrl(id, size);
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setFailed(false); setLoaded(false); }, [url]);
+
+  return (
+    <div className={`card-image ${className}`}>
+      {url && !failed ? (
+        <img src={url} alt={name} draggable={false} loading="lazy"
+             className={loaded ? "loaded" : ""}
+             onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+      ) : null}
+      {(!url || failed || !loaded) && <span className="card-image-name">{name}</span>}
+    </div>
+  );
+}
+
+// The overlay opens in steps, so the two screens are never seen on top of each other. Opening:
+// the backdrop dims the page, the panel's empty box fades in over it, then its contents. Closing:
+// the reverse. (The panel and contents follow the backdrop's "open" / "closed" state.)
+const BACKDROP: Variants = {
+  open: { opacity: 1, transition: { duration: 0.16, ease: "easeOut" } },
+  closed: { opacity: 0, transition: { delay: 0.2, duration: 0.16, ease: "easeIn" } },
+};
+const PANEL: Variants = {
+  open: { opacity: 1, y: 0, scale: 1, transition: { delay: 0.1, duration: 0.18, ease: [0.2, 0.7, 0.2, 1] } },
+  closed: { opacity: 0, y: 8, scale: 0.99, transition: { delay: 0.08, duration: 0.14, ease: "easeIn" } },
+};
+const CONTENT: Variants = {
+  open: { opacity: 1, transition: { delay: 0.24, duration: 0.18, ease: "easeOut" } },
+  closed: { opacity: 0, transition: { duration: 0.1, ease: "easeIn" } },
+};
+
+/** Full-window overlay panel that fades and slides in, like the desktop app's overlays.
+ *  With `keepMounted` its contents are built once and kept (hidden) while closed, so opening and
+ *  closing only run the animation; building a large view at that moment stalls the fade. */
+export function Overlay({ open, onClose, children, label, keepMounted = false }: {
+  open: boolean; onClose: () => void; children: ReactNode; label: string; keepMounted?: boolean;
+}) {
+  // Rendered from the first open (or from the start with keepMounted) and then kept
+  const [mounted, setMounted] = useState(open || keepMounted);
+  // Hidden (not just transparent) once the closing animation has finished
+  const [hidden, setHidden] = useState(!open);
+  useLayoutEffect(() => {
+    if (open) { setMounted(true); setHidden(false); }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!mounted) return null;
+  return (
+    <motion.div className="overlay-backdrop" role="dialog" aria-modal="true" aria-label={label}
+                style={{ visibility: hidden ? "hidden" : "visible" }}
+                variants={BACKDROP} initial="closed" animate={open ? "open" : "closed"}
+                onAnimationComplete={(state) => { if (state === "closed") setHidden(true); }}>
+      <motion.div className="overlay-panel" variants={PANEL}>
+        <motion.div variants={CONTENT}>{children}</motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+export interface Toast {
+  id: number;
+  message: string;
+}
+
+export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
+  return (
+    <div className="toasts" aria-live="polite">
+      <AnimatePresence>
+        {toasts.map((toast) => (
+          <motion.div key={toast.id} layout
+                      initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: 40 }}>
+            <Alert severity="error" variant="filled" onClose={() => onDismiss(toast.id)}>{toast.message}</Alert>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export interface SegmentOption<T> {
+  value: T;
+  label: ReactNode;
+  /** Colours the pill: a tag (engine, non_engine, brick); the accent otherwise */
+  tone?: string;
+}
+
+/** Pick one of a few options (MUI toggle buttons), with a pill that slides to the selected one. */
+export function Segmented<T extends string | number>({ value, options, onChange, pillId, label }: {
+  value: T;
+  options: SegmentOption<T>[];
+  onChange: (value: T) => void;
+  /** Unique per control, so the pill slides within it */
+  pillId: string;
+  label: string;
+}) {
+  return (
+    <ToggleButtonGroup exclusive value={value} aria-label={label}
+                       onChange={(_, next: T | null) => next !== null && onChange(next)}>
+      {options.map((option) => (
+        <ToggleButton key={option.value} value={option.value}
+                      className={option.tone ? `tone-${option.tone}` : ""}>
+          {value === option.value && (
+            <motion.span layoutId={pillId} className="segment-pill"
+                         transition={{ type: "spring", stiffness: 500, damping: 38 }} />
+          )}
+          <span className="segment-label">{option.label}</span>
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
+  );
+}
+
+/** A small spinner for busy buttons */
+export function Spinner() {
+  return <CircularProgress size={16} color="inherit" thickness={5} />;
+}
+
+/** A number that eases to its new value whenever it changes. */
+export function AnimatedPercent({ value, digits = 1 }: { value: number; digits?: number }) {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    const start = performance.now();
+    const from = shown;
+    let frame = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / 450);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(from + (value - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{(shown * 100).toFixed(digits)}%</>;
+}
+
+/** A horizontal bar whose width animates to the value (0..1). */
+export function Bar({ value, tone }: { value: number; tone: string }) {
+  return (
+    <div className="bar">
+      <motion.div className={`bar-fill tone-${tone}`} initial={false}
+                  animate={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
+                  transition={{ type: "spring", stiffness: 140, damping: 22 }} />
+    </div>
+  );
+}

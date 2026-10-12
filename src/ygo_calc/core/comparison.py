@@ -92,7 +92,7 @@ def format_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int =
     out: List[str] = []
 
     turn = "going first" if hand_size == 5 else "going second"
-    out.append(f"DECK COMPARISON ({turn}: {hand_size} cards)\n")
+    out.append(f"DECK COMPARISON ({turn})\n")
     out.append("=" * width + "\n")
     out.append(_row("", n1, n2, "Diff", "Better"))
 
@@ -135,7 +135,8 @@ def format_card_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: 
 
     out: List[str] = []
     out.append("\n" + "-" * width + "\n")
-    out.append(f"CARD ODDS (at least 1 copy in {hand_size} cards)\n")
+    turn = "going first" if hand_size == 5 else "going second"
+    out.append(f"CARD ODDS (at least 1 copy, {turn})\n")
     out.append(f"\n  {deck_1.name[:11]:^11}   {deck_2.name[:11]:^11}\n")
     out.append(f"  {'Qty':>3} {'Odds':>7}   {'Qty':>3} {'Odds':>7}   {'Diff':>6}   Card\n")
 
@@ -156,3 +157,52 @@ def format_card_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: 
         out.append("\n  Same copies in both:\n")
         out.extend(card_row(name) for name in same)
     return "".join(out)
+
+
+def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) -> Dict:
+    """The same comparison as format_comparison, as plain data (for the web app).
+
+    Probabilities are 0..1. "better" is 1 or 2 for the deck with the better value, or
+    None when they're (about) equal or neither is better.
+    """
+    counts_1, counts_2 = count_categories(deck_1.pool), count_categories(deck_2.pool)
+    composition = [{"label": "Deck size", "a": deck_1.size, "b": deck_2.size}]
+    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+        composition.append({"label": label, "a": counts_1[key], "b": counts_2[key]})
+    untagged_1 = deck_1.size - sum(counts_1.values())
+    untagged_2 = deck_2.size - sum(counts_2.values())
+    if untagged_1 or untagged_2:
+        composition.append({"label": "Untagged", "a": untagged_1, "b": untagged_2})
+
+    def better(diff: float, higher_is_better: bool) -> Optional[int]:
+        if abs(diff) < 0.0005:
+            return None
+        return 2 if (diff > 0) == higher_is_better else 1
+
+    odds = []
+    for entry, p_1, p_2 in zip(HAND_ODDS, hand_odds(deck_1, hand_size), hand_odds(deck_2, hand_size)):
+        odds.append({"label": entry.label, "a": p_1, "b": p_2,
+                     "better": better(p_2 - p_1, entry.higher_is_better)})
+
+    averages = []
+    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+        averages.append({
+            "label": label,
+            "a": hand_size * counts_1[key] / deck_1.size if deck_1.size else 0.0,
+            "b": hand_size * counts_2[key] / deck_2.size if deck_2.size else 0.0,
+        })
+
+    copies_1, copies_2 = deck_1.copies(), deck_2.copies()
+    names = list(copies_1) + [name for name in copies_2 if name not in copies_1]
+    cards = []
+    for name in names:
+        q1, q2 = copies_1.get(name, 0), copies_2.get(name, 0)
+        cards.append({
+            "name": name, "a_copies": q1, "b_copies": q2, "changed": q1 != q2,
+            "a": probability_at_least(deck_1.size, q1, hand_size, 1) if q1 else 0.0,
+            "b": probability_at_least(deck_2.size, q2, hand_size, 1) if q2 else 0.0,
+        })
+    cards.sort(key=lambda card: not card["changed"])  # Changed cards first, else deck order
+
+    return {"hand_size": hand_size, "names": [deck_1.name, deck_2.name],
+            "composition": composition, "odds": odds, "averages": averages, "cards": cards}

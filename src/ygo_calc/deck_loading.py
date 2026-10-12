@@ -1,11 +1,11 @@
-"""Loading a deck code (ydke:// or .ydk text) into a deck, shared by the main and compare windows."""
+"""Loading a deck code (ydke:// or .ydk text) into a deck, shared by the desktop and web apps."""
 
 from typing import Dict
 
-from ..cards import fetch_multiple_card_names
-from ..core.deck import YuGiOhDeck
-from ..core.deck_builder import count_cards, fill_deck
-from ..core.deck_parser import extract_main_deck_ids
+from .cards import fetch_multiple_card_names
+from .core.deck import YuGiOhDeck
+from .core.deck_builder import count_cards, fill_deck
+from .core.deck_parser import extract_main_deck_ids
 
 
 def load_main_deck(deck: YuGiOhDeck, deck_code: str) -> Dict[str, str]:

@@ -126,7 +126,7 @@ def format_card_odds(pool: CardPool, deck_size: int, hand_size: int = 5,
     out: List[str] = []
     out.append("\n" + "-" * 50 + "\n")
     out.append("CARD ODDS (at least 1 copy)\n\n")
-    out.append(f"  Qty  1st ({hand_size})  2nd ({hand_size + 1})  Card\n")
+    out.append("  Qty  First    Second   Card\n")
     for key, title in _CARD_ODDS_GROUPS:
         if not groups[key]:
             continue

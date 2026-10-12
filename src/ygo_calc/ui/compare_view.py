@@ -21,12 +21,12 @@ from . import theme
 from .advanced_view import AdvancedDeckView
 from .counts_panel import CountsPanel
 from .deck_input_panel import DeckInputPanel
-from .deck_loading import load_main_deck
+from ..deck_loading import load_main_deck
 from .image_loader import ImageLoader
 from .window import lighten_scrollbar
 
 DECK_NAMES = ("Deck 1", "Deck 2")
-HAND_SIZES = {"Going first (5 cards)": 5, "Going second (6 cards)": 6}
+HAND_SIZES = {"Going first": 5, "Going second": 6}
 
 
 class DeckSetup(ctk.CTkFrame):

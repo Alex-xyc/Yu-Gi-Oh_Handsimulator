@@ -1,0 +1,43 @@
+/* Stylesheet entry. Layer order (lowest first): Tailwind's theme and base reset, MUI's component
+   styles, the app's own stylesheet, then Tailwind utilities, so a utility class always wins. */
+@layer theme, base, mui, components, utilities;
+
+@import "tailwindcss";
+@import "./styles.css" layer(components);
+
+/* Page and heading defaults, in the base layer so MUI components and classes override them
+   (Tailwind's reset already makes buttons inherit the font and colour) */
+@layer base {
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg-glow), var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
+  h2 { font-size: 15px; margin-bottom: 14px; }
+  h3 { font-size: 13px; margin-bottom: 10px; }
+}
+
+/* Tailwind colour/size names for the app's design tokens (defined in styles.css), e.g.
+   bg-surface-2, text-muted, border-line, text-engine, ring-sixth */
+@theme inline {
+  --color-panel: var(--surface);
+  --color-surface: var(--surface-solid);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-engine: var(--engine);
+  --color-non-engine: var(--non_engine);
+  --color-brick: var(--brick);
+  --color-deck-a: var(--deck-a);
+  --color-deck-b: var(--deck-b);
+  --color-sixth: var(--sixth);
+  --font-mono: var(--mono);
+}

@@ -1,0 +1,218 @@
+/* Sleek dark theme. Tag colours match the desktop app: brick red, non-engine yellow, engine green. */
+
+:root {
+  --bg: #0a0c11;
+  --bg-glow: radial-gradient(1200px 600px at 15% -10%, rgba(124, 92, 255, 0.16), transparent 60%),
+             radial-gradient(900px 500px at 100% 0%, rgba(34, 211, 238, 0.08), transparent 60%);
+  --surface: rgba(22, 25, 34, 0.86);
+  --surface-solid: #151821;
+  --surface-2: #1c202b;
+  --surface-3: #252a37;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text: #e9ebf2;
+  --muted: #8a92a6;
+  --accent: #7c5cff;
+  --accent-hover: #8f74ff;
+  --accent-soft: rgba(124, 92, 255, 0.16);
+  --engine: #22c55e;
+  --non_engine: #eab308;
+  --brick: #ef4444;
+  /* Compare colours: blue and pink stay clear of the purple accent and the red/yellow/green tags */
+  --deck-a: #4f8dff;
+  --deck-b: #f472b6;
+  /* The 6th card's marker: Okabe–Ito sky blue, readable with colour blindness and apart from the tag colours */
+  --sixth: #56b4e9;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --mono: "JetBrains Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+
+/* Page and heading defaults are in index.css (base layer), below MUI and component styles */
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.mono { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.center { text-align: center; }
+.spacer { flex: 1; }
+.error { color: #f87171; }
+.ok { color: #4ade80; }
+
+/* Tones */
+.tone-engine { --tone: var(--engine); }
+.tone-non_engine { --tone: var(--non_engine); }
+.tone-brick { --tone: var(--brick); }
+.tone-deck-a { --tone: var(--deck-a); }
+.tone-deck-b { --tone: var(--deck-b); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px;
+       background: var(--tone, var(--muted)); box-shadow: 0 0 10px var(--tone, transparent); }
+.dot.deck-a { --tone: var(--deck-a); }
+.dot.deck-b { --tone: var(--deck-b); }
+.tag-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* MUI components are styled in theme.ts; these only place them */
+.grow { flex: 1; min-width: 0; }
+
+/* Layout */
+.app { max-width: 1480px; margin: 0 auto; padding: 18px 24px 40px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand h1 { font-size: 19px; }
+.logo { width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 6px 22px rgba(124, 92, 255, 0.4); }
+.layout { display: flex; flex-direction: column; gap: 16px; }
+/* No backdrop blur here or on overlays: Chrome drops it for a frame while an overlay fades in */
+.card-panel { background: var(--surface); border: 1px solid var(--border);
+              border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; }
+
+/* Deck loading and categories */
+.setup { display: flex; flex-direction: column; gap: 14px; }
+.deck-loader { display: flex; flex-direction: column; gap: 8px; padding: 4px; border-radius: 12px;
+               border: 1px dashed transparent; transition: border-color 0.2s, background 0.2s; }
+.deck-loader.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.loader-row { display: flex; align-items: center; gap: 10px; }
+.loader-row.secondary { font-size: 13px; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-status { font-size: 13px; min-height: 20px; }
+
+/* Card images */
+.card-image { position: relative; width: 100%; aspect-ratio: 59 / 86; border-radius: 6px; overflow: hidden;
+              background: linear-gradient(160deg, #2a2f3d, #1a1e28); }
+.card-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                  opacity: 0; transition: opacity 0.35s var(--ease); }
+.card-image img.loaded { opacity: 1; }
+.card-image-name { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px;
+                   text-align: center; font-size: 11px; line-height: 1.3; color: var(--muted); }
+
+/* Hand (layout in HandView.tsx with Tailwind) */
+.card-back { display: block; width: 100%; height: 100%; }
+.hand-badge { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 0; border-radius: 6px;
+              text-align: center; font-size: 11px; font-weight: 700; color: #0b0d12;
+              background: var(--tone); box-shadow: 0 0 16px color-mix(in srgb, var(--tone) 60%, transparent); }
+
+/* Stats */
+.stats { display: flex; flex-direction: column; gap: 22px; }
+.stats-panel { display: flex; flex-direction: column; }
+.stats-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+.stats-empty p { margin: 0; }
+.chart-icon { width: 120px; height: 84px; filter: drop-shadow(0 6px 18px rgba(124, 92, 255, 0.35)); }
+.stats-section h3 .small { font-weight: 400; }
+.composition, .tiles { display: flex; flex-wrap: wrap; gap: 10px; }
+.stat-tile { flex: 1; min-width: 74px; display: flex; flex-direction: column; padding: 10px 12px; border-radius: 12px;
+             background: var(--surface-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
+.stat-tile[class*="tone-"]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
+.stat-tile.wide { min-width: 120px; }
+.stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-tile .muted { font-size: 12px; }
+.odds-rows { display: flex; flex-direction: column; gap: 8px; }
+/* One block per category, divided by a line */
+.odds-groups { display: flex; flex-direction: column; }
+.odds-groups .odds-rows { padding: 12px 0; border-top: 1px solid var(--border); }
+.odds-groups .odds-rows:first-child { border-top: none; padding-top: 0; }
+.odds-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) 58px; align-items: center; gap: 12px; }
+.odds-row .value { text-align: right; }
+.bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 65%, transparent), var(--tone));
+            box-shadow: 0 0 12px color-mix(in srgb, var(--tone) 50%, transparent); }
+.matrix-wrap { overflow-x: auto; }
+.matrix { border-collapse: separate; border-spacing: 3px; width: 100%; table-layout: fixed; }
+.matrix th:first-child { width: 44px; }
+.matrix th { font-size: 11px; font-weight: 500; color: var(--muted); padding: 2px 4px; }
+.matrix td { text-align: center; padding: 6px 4px; border-radius: 6px; color: var(--text);
+             background: rgba(124, 92, 255, var(--heat)); transition: background 0.4s var(--ease); }
+table { border-collapse: collapse; width: 100%; }
+.card-odds th, .compare-table th { text-align: left; font-size: 11px; font-weight: 500; color: var(--muted);
+                                   text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px;
+                                   border-bottom: 1px solid var(--border); }
+.card-odds td, .compare-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); }
+.card-odds tbody tr:not(.group-row):hover td, .compare-table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.group-row td { padding-top: 12px; font-weight: 600; font-size: 12px; border-bottom: none; }
+/* max-width: 0 + width: 100% lets a table cell shrink and ellipsize instead of widening the table */
+.card-name { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Overlays */
+.overlay-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(5, 6, 10, 0.88);
+                    display: flex; padding: 16px; }
+.overlay-panel { flex: 1; overflow: auto; scrollbar-gutter: stable; background: var(--surface-solid); border: 1px solid var(--border-strong);
+                 border-radius: 18px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); padding: 18px 22px; }
+.overlay-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.overlay-header h2 { font-size: 18px; margin-bottom: 8px; }
+.header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.toasts { position: fixed; right: 20px; bottom: 20px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
+.toasts .MuiAlert-root { max-width: 380px; }
+
+/* Segmented control (MUI toggle buttons) with a sliding pill */
+.segment-pill { position: absolute; inset: 0; border-radius: 9px; background: var(--tone, var(--accent));
+                box-shadow: 0 4px 16px color-mix(in srgb, var(--tone, var(--accent)) 45%, transparent); }
+.MuiToggleButton-root.tone-non_engine.Mui-selected { color: #0b0d12; }
+.segment-label { position: relative; font-weight: 600; }
+
+/* Tagging */
+.tag-tile { position: relative; padding: 0; border: 2px solid transparent; border-radius: 9px; background: none; cursor: pointer;
+            transition: border-color 0.2s var(--ease), box-shadow 0.25s var(--ease); }
+.tag-tile .card-image { border-radius: 7px; }
+.tile-tint { position: absolute; inset: 0; border-radius: 7px; background: var(--tone, transparent); opacity: 0;
+             mix-blend-mode: color; transition: opacity 0.25s var(--ease); pointer-events: none; }
+.tag-tile.tagged { border-color: var(--tone); box-shadow: 0 0 18px color-mix(in srgb, var(--tone) 45%, transparent); }
+.tag-tile.tagged .tile-tint { opacity: 0.55; }
+.tile-badge { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 1px 8px; border-radius: 999px;
+              font-size: 10px; font-weight: 700; color: #0b0d12; background: var(--tone); white-space: nowrap; }
+
+/* Compare */
+.compare-view { display: flex; flex-direction: column; gap: 14px; max-width: 1200px; margin: 0 auto; }
+.compare-view .overlay-header { margin-bottom: 0; }
+/* Tabs size to their deck name, share the row when names are long, and shorten with an ellipsis */
+.tab.MuiTab-root { flex: 0 1 auto; max-width: 50%; }
+.tab-label { display: flex; align-items: center; min-width: 0; max-width: 100%; white-space: nowrap; }
+.tab .dot { flex: none; }
+.tab-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tab .tab-size { margin-left: 6px; font-weight: 500; flex: none; }
+.deck-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+             vertical-align: bottom; }
+.compare-view .card-panel { box-shadow: none; }
+.tab-content { display: flex; flex-direction: column; gap: 14px; }
+.compare-actions { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
+.compare-results { display: flex; flex-direction: column; gap: 22px; }
+.compare-legend { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compare-legend .MuiChip-root { max-width: min(260px, 100%); }
+.compare-legend .MuiChip-root .dot { flex: none; margin-right: 0; }
+.compare-table { table-layout: fixed; }
+.compare-table td:not(:first-child), .compare-table th:not(:first-child) { text-align: right; white-space: nowrap; width: 130px; }
+.compare-table th:not(:first-child) .deck-name { text-transform: none; }
+.compare-table tr.changed td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* Each statistic gets its own band, divided by a line */
+.compare-odds { display: flex; flex-direction: column; }
+.compare-odds-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(160px, 2fr) 64px minmax(90px, 140px);
+                    align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.compare-odds-row:first-child { border-top: 1px solid var(--border); }
+.dual-bars { display: flex; flex-direction: column; gap: 9px; }
+.dual { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 10px; opacity: 0.7; transition: opacity 0.2s; }
+.dual.better { opacity: 1; }
+.dual .mono { text-align: right; font-size: 12px; }
+.diff { font-family: var(--mono); font-size: 12.5px; text-align: right; display: block; }
+.diff.good { color: #4ade80; }
+.diff.bad { color: #f87171; }
+.diff.zero { color: var(--muted); }
+.better-tag { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.better-tag .dot { margin-right: 6px; }
+@media (max-width: 700px) {
+  .compare-odds-row { grid-template-columns: 1fr 64px; }
+  .compare-odds-row .dual-bars { grid-column: 1 / -1; grid-row: 2; }
+  .better-tag { display: none; }
+  .compare-table td:not(:first-child), .compare-table th:not(:first-child) { width: 74px; }
+  .tab { padding: 10px 10px; }
+  .tab .tab-size { display: none; }
+  .odds-row { grid-template-columns: 1fr 58px; }
+  .odds-row .bar { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* Phones (after the rules it overrides) */
+@media (max-width: 600px) {
+  .app { padding: 12px 16px 32px; }
+  .brand .small { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
