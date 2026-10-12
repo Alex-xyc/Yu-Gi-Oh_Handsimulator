@@ -1,0 +1,24 @@
+import GlobalStyles from "@mui/material/GlobalStyles";
+import { StyledEngineProvider, ThemeProvider } from "@mui/material/styles";
+import { MotionConfig } from "framer-motion";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./index.css";
+import { theme } from "./theme";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    {/* MUI's styles go in the "mui" CSS layer, below the app's stylesheet and Tailwind
+        utilities (see index.css); the order is declared first, before any styles */}
+    <StyledEngineProvider enableCssLayer>
+      <GlobalStyles styles="@layer theme, base, mui, components, utilities;" />
+      <ThemeProvider theme={theme}>
+        {/* Follows the system "reduce motion" setting */}
+        <MotionConfig reducedMotion="user">
+          <App />
+        </MotionConfig>
+      </ThemeProvider>
+    </StyledEngineProvider>
+  </StrictMode>,
+);

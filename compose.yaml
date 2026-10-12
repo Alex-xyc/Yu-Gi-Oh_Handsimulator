@@ -1,0 +1,19 @@
+# The web app. From this folder:
+#   docker compose up -d --build     build (if changed) and start, or restart with the latest code
+#   docker compose logs -f           follow the server log
+#   docker compose down              stop and remove the container (the image cache volume is kept)
+
+services:
+  web:
+    build: .
+    image: ygo-calc
+    container_name: ygo-calc
+    ports:
+      - "8000:8000"
+    volumes:
+      # Card images and EDOPro card databases, kept across rebuilds
+      - ygo-cache:/cache
+    restart: unless-stopped
+
+volumes:
+  ygo-cache:

@@ -1,0 +1,25 @@
+/* Stylesheet entry. Layer order (lowest first): Tailwind's theme and base reset, MUI's component
+   styles, the app's own stylesheet, then Tailwind utilities, so a utility class always wins. */
+@layer theme, base, mui, components, utilities;
+
+@import "tailwindcss";
+/* The theme (colours, radii, fonts) and the token CSS variables, from src/design/tokens.ts */
+@config "../tailwind.config.ts";
+@import "./styles.css" layer(components);
+
+/* Page and heading defaults, in the base layer so MUI components and classes override them
+   (Tailwind's reset already makes buttons inherit the font and colour) */
+@layer base {
+  :root { color-scheme: dark; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg-glow), var(--color-bg);
+    background-attachment: fixed;
+    color: var(--color-text);
+    font: 14px/1.5 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-weight: 650; letter-spacing: -0.01em; color: var(--color-text); }
+  h2 { font-size: 15px; margin-bottom: 14px; }
+  h3 { font-size: 13px; margin-bottom: 10px; }
+}

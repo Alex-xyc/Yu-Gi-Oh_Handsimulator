@@ -63,3 +63,5 @@ pip-wheel-metadata/
 
 # Misc caches
 .cache/
+# Web front end
+web/node_modules/

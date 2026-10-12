@@ -1,0 +1,5 @@
+# The web app (python src/web.py); the desktop app only needs requirements.txt
+fastapi==0.118.0
+uvicorn==0.37.0
+# For the API tests (fastapi.testclient)
+httpx==0.28.1
