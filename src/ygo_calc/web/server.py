@@ -9,10 +9,14 @@ counts and sends them with each request.
     POST /api/compare                two deck setups -> side-by-side odds
     GET  /api/cards/{id}/image       card image (cached on disk)
 
+Security headers, request size limits and rate limits are in security.py. The interactive
+API docs (/api/docs) are only served when YGO_API_DOCS=1.
+
 Copyright (c) 2026 Alex-xyc
 """
 
 import os
+import re
 from typing import List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -30,6 +34,7 @@ from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck
 from ..paths import SRC_DIR
 from .images import SIZES, card_image_path
+from .security import SecurityMiddleware
 
 # web/dist next to src/, unless YGO_WEB_DIST points elsewhere
 WEB_DIST = os.environ.get("YGO_WEB_DIST",
@@ -101,7 +106,15 @@ class CompareRequest(BaseModel):
 
 # The app
 
-app = FastAPI(title="Yu-Gi-Oh! Hand Simulator", docs_url="/api/docs", openapi_url="/api/openapi.json")
+# The interactive docs are off on a public server unless asked for
+API_DOCS = os.environ.get("YGO_API_DOCS") == "1"
+app = FastAPI(title="Yu-Gi-Oh! Hand Simulator", redoc_url=None,
+              docs_url="/api/docs" if API_DOCS else None,
+              openapi_url="/api/openapi.json" if API_DOCS else None)
+app.add_middleware(SecurityMiddleware)
+
+# Card IDs are plain numbers (ASCII digits only: str.isdigit also accepts other scripts' digits)
+CARD_ID = re.compile(r"[0-9]{1,10}")
 
 
 @app.post("/api/decks")
@@ -152,7 +165,7 @@ def compare(body: CompareRequest):
 
 @app.get("/api/cards/{card_id}/image")
 def card_image(card_id: str, size: Literal["small", "full"] = "small"):
-    if not card_id.isdigit() or len(card_id) > 12 or size not in SIZES:
+    if not CARD_ID.fullmatch(card_id) or size not in SIZES:
         raise HTTPException(404)
     path = card_image_path(card_id, size)
     if path is None:

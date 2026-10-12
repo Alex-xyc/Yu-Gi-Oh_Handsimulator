@@ -93,7 +93,7 @@ export default function App() {
             <img className="logo" src="/icon-192.png" alt="" />
             <div>
               <h1>Hand Simulator</h1>
-              <span className="muted small">Yu-Gi-Oh! opening-hand odds · by Xin Yuan</span>
+              <span className="muted small">Yu-Gi-Oh! hypergeometric calculator · by Xin Yuan</span>
             </div>
           </div>
           <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>Compare decks</Button>

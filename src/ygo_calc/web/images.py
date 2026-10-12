@@ -7,7 +7,8 @@ once and serves its own copy.
 import logging
 import os
 import threading
-from typing import List, Optional
+import time
+from typing import Dict, List, Optional
 
 from ..cards import cache
 from ..cards.edopro import EDOPRO_IMAGE_URL
@@ -19,8 +20,16 @@ YGOPRODECK_IMAGE_URLS = {
 }
 SIZES = tuple(YGOPRODECK_IMAGE_URLS)
 
-_locks: dict = {}
+# Card images are well under this; anything bigger isn't a card image
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+# IDs with no image anywhere aren't tried again for a while (so made-up IDs can't make the
+# server call the image sites over and over), up to a bounded number of them
+MISSING_FOR_SECONDS = 6 * 60 * 60
+MAX_MISSING = 10_000
+
+_locks: Dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
+_missing: Dict[str, float] = {}
 
 
 def image_cache_dir() -> str:
@@ -49,21 +58,37 @@ def card_image_path(card_id: str, size: str) -> Optional[str]:
     path = os.path.join(image_cache_dir(), f"{card_id}_{size}.jpg")
     if os.path.exists(path):
         return path
+    if time.monotonic() < _missing.get(path, 0):
+        return None
     # One download per image, even when several requests for it arrive at once
     with _locks_guard:
         lock = _locks.setdefault(path, threading.Lock())
-    with lock:
-        if os.path.exists(path):
-            return path
-        for url in image_urls(card_id, size):
-            try:
-                data = fetch_bytes(url, timeout=10)
-            except Exception:
-                logging.warning("Failed to load image for %s from %s", card_id, url)
-                continue
-            temp = path + ".part"
-            with open(temp, "wb") as f:
-                f.write(data)
-            os.replace(temp, path)
-            return path
-    return None
+    try:
+        with lock:
+            if os.path.exists(path):
+                return path
+            for url in image_urls(card_id, size):
+                try:
+                    data = fetch_bytes(url, timeout=10, max_bytes=MAX_IMAGE_BYTES)
+                except Exception:
+                    logging.warning("Failed to load image for %s from %s", card_id, url)
+                    continue
+                temp = f"{path}.{threading.get_ident()}.part"
+                with open(temp, "wb") as f:
+                    f.write(data)
+                os.replace(temp, path)
+                return path
+            _remember_missing(path)
+            return None
+    finally:
+        with _locks_guard:
+            if _locks.get(path) is lock and not lock.locked():
+                del _locks[path]
+
+
+def _remember_missing(path: str):
+    now = time.monotonic()
+    if len(_missing) >= MAX_MISSING:
+        for key in [key for key, until in _missing.items() if until <= now] or list(_missing)[:MAX_MISSING // 10]:
+            _missing.pop(key, None)
+    _missing[path] = now + MISSING_FOR_SECONDS
