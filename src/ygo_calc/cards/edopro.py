@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import sqlite3
 import time
 from typing import Dict, List
@@ -13,6 +14,10 @@ EDOPRO_CDB_BASE_URL = "https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/m
 EDOPRO_CDB_FILES = ["cards.cdb", "cards-unofficial.cdb", "prerelease-others.cdb"]
 EDOPRO_CDB_LIST_URL = "https://api.github.com/repos/ProjectIgnis/BabelCDB/contents"
 EDOPRO_IMAGE_URL = "https://pics.projectignis.org:2096/pics/{card_id}.jpg"
+# Database file names from the listing: letters, digits, "-", "_" and "." only, ending in .cdb
+SAFE_CDB_NAME = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]{0,99}\.cdb")
+# The largest database we'll download (the real ones are a few to tens of megabytes)
+MAX_CDB_BYTES = 200 * 1024 * 1024
 EDOPRO_CACHE_MAX_AGE = 7 * 24 * 60 * 60  # Re-download CDBs weekly
 EDOPRO_TYPE_TOKEN = 0x4000
 
@@ -31,7 +36,8 @@ def _edopro_cdb_names() -> List[str]:
     try:
         for entry in fetch_json(EDOPRO_CDB_LIST_URL, timeout=10, accept_json=False):
             name = entry.get('name', '') if isinstance(entry, dict) else ''
-            if (name.endswith('.cdb') and name not in names
+            # The name becomes a file name here and part of a URL: plain names only
+            if (SAFE_CDB_NAME.fullmatch(name) and name not in names
                     and 'rush' not in name and 'skills' not in name):
                 names.append(name)
     except Exception:
@@ -45,7 +51,9 @@ def _edopro_cdb_path(name: str) -> str:
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < EDOPRO_CACHE_MAX_AGE:
         return path
     try:
-        data = fetch_bytes(EDOPRO_CDB_BASE_URL + name, timeout=60)
+        if not SAFE_CDB_NAME.fullmatch(name):
+            raise ValueError(f"Unexpected database name {name!r}")
+        data = fetch_bytes(EDOPRO_CDB_BASE_URL + name, timeout=60, max_bytes=MAX_CDB_BYTES)
         if not data.startswith(b'SQLite format 3\x00'):
             raise ValueError(f"{name} is not a SQLite database")
         with open(path, 'wb') as f:

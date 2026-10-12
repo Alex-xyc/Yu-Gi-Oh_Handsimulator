@@ -1,5 +1,7 @@
 # The web app (python src/web.py); the desktop app only needs requirements.txt
-fastapi==0.118.0
-uvicorn==0.37.0
+fastapi==0.141.1
+# FastAPI's web framework, pinned to a release with all known security fixes
+starlette==1.7.0
+uvicorn==0.54.0
 # For the API tests (fastapi.testclient)
 httpx==0.28.1
