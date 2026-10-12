@@ -13,15 +13,18 @@ from . import theme
 class DeckInputPanel(ctk.CTkFrame):
     """Lets the user load a deck; calls on_load(deck_code) with the code or file text."""
 
-    def __init__(self, master, on_load: Callable[[str], None]):
+    def __init__(self, master, on_load: Callable[[str], None], show_title: bool = True):
         super().__init__(master)
         self.on_load = on_load
         self.grid_columnconfigure(1, weight=1)
 
         # Title
-        title_label = ctk.CTkLabel(self, text=theme.HEADER_TITLE,
-                                   font=ctk.CTkFont(size=24, weight="bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(10, 15))
+        if show_title:
+            title_label = ctk.CTkLabel(self, text=theme.HEADER_TITLE,
+                                       font=ctk.CTkFont(size=24, weight="bold"))
+            title_label.grid(row=0, column=0, columnspan=3, pady=(10, 15))
+        else:
+            self.grid_rowconfigure(0, minsize=8)
 
         # YDKE Code input
         ydke_label = ctk.CTkLabel(self, text="YDKe Code:", font=ctk.CTkFont(size=14))
@@ -62,11 +65,11 @@ class DeckInputPanel(ctk.CTkFrame):
         """Load deck from ydke code"""
         ydke_code = self.ydke_entry.get().strip()
         if not ydke_code:
-            messagebox.showwarning("Warning", "Please enter a ydke code.")
+            messagebox.showwarning("Warning", "Please enter a ydke code.", parent=self)
             return
 
         if not ydke_code.startswith("ydke://"):
-            messagebox.showerror("Error", "Invalid format. Code must start with 'ydke://'")
+            messagebox.showerror("Error", "Invalid format. Code must start with 'ydke://'", parent=self)
             return
 
         self.on_load(ydke_code)
@@ -76,6 +79,7 @@ class DeckInputPanel(ctk.CTkFrame):
         decklists_path = ensure_user_decklists_dir()
 
         filepath = filedialog.askopenfilename(
+            parent=self.winfo_toplevel(),
             title="Select YDK File",
             initialdir=decklists_path,
             filetypes=[("YDK files", "*.ydk"), ("All files", "*.*")]

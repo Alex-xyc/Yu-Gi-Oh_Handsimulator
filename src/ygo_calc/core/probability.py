@@ -1,7 +1,8 @@
 """Hypergeometric probability maths for opening hands."""
 
+from itertools import product
 from math import comb
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .deck import YuGiOhDeck
 
@@ -43,6 +44,28 @@ def engine_non_engine_probability(deck_size: int, engine_count: int, non_engine_
                     comb(non_engine_count, non_engine_drawn) *
                     comb(other_count, other_in_hand)) / comb(deck_size, hand_size)
     return None
+
+
+def category_probability(deck_size: int, counts: Sequence[int], hand_size: int,
+                         accept: Callable[[Tuple[int, ...]], bool]) -> float:
+    """Chance that the hand's per-category draw counts satisfy accept.
+
+    counts: copies of each category (the rest of the deck counts as "other").
+    accept: called with the number drawn from each category, in the order of counts.
+    """
+    other = deck_size - sum(counts)
+    total = comb(deck_size, hand_size)
+    if other < 0 or total == 0:
+        return 0.0
+    ways = 0
+    for drawn in product(*(range(min(n, hand_size) + 1) for n in counts)):
+        rest = hand_size - sum(drawn)
+        if 0 <= rest <= other and accept(drawn):
+            combos = comb(other, rest)
+            for n, k in zip(counts, drawn):
+                combos *= comb(n, k)
+            ways += combos
+    return ways / total
 
 
 def calculate_probabilities(deck: YuGiOhDeck, hand_size: int = 5) -> Dict:

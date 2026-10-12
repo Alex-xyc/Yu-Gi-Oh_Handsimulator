@@ -7,6 +7,7 @@ Panels (each in its own module):
         HandPanel   the drawn hand and its text                 (hand_panel.py)
         StatsPanel  probabilities & statistics                  (stats_panel.py)
     AdvancedDeckView  "Show Decklist" overlay for tagging cards (advanced_view.py)
+    CompareView     "Compare Decks" overlay: two decks' odds side by side (compare_view.py)
 
 Copyright (c) 2026 Alex-xyc
 """
@@ -16,18 +17,20 @@ from typing import Dict, List, Optional
 
 import customtkinter as ctk
 
-from ..cards import fetch_multiple_card_names, get_card_image_urls
+from ..cards import get_card_image_urls
 from ..core.categories import (BRICK, ENGINE, NON_ENGINE, CardPool, count_categories, pool_from_category_sets, pool_from_counts,
                                pool_from_tags, sync_category_sets)
 from ..core.deck import YuGiOhDeck
-from ..core.deck_builder import TooManyCopiesError, count_cards, fill_deck
-from ..core.deck_parser import DeckParseError, extract_main_deck_ids
+from ..core.deck_builder import TooManyCopiesError
+from ..core.deck_parser import DeckParseError
 from ..core.report import format_card_odds, format_statistics_report
 from ..core.simulation import draw_from_pool
 from . import theme
 from .advanced_view import AdvancedDeckView
+from .compare_view import CompareView
 from .counts_panel import CountsPanel
 from .deck_input_panel import DeckInputPanel
+from .deck_loading import load_main_deck
 from .hand_panel import HandPanel
 from .image_loader import ImageLoader
 from .split_view import SplitView
@@ -67,6 +70,8 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.image_loader = ImageLoader()
         self.advanced_view: Optional[AdvancedDeckView] = None
         self._advanced_overlay = None
+        self.compare_view: Optional[CompareView] = None
+        self._compare_overlay = None
 
         self.create_widgets()
 
@@ -86,7 +91,8 @@ class YuGiOhHandSimulator(ctk.CTk):
         # MIDDLE SECTION: Card Counts
         self.counts_panel = CountsPanel(self, on_apply=self.apply_and_draw,
                                         on_show_decklist=self.open_advanced_view,
-                                        on_locked_click=self.switch_to_typed_counts)
+                                        on_locked_click=self.switch_to_typed_counts,
+                                        on_compare=self.open_compare_view)
         self.counts_panel.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
         # BOTTOM SECTION: test hand and statistics, side by side with a draggable divider
@@ -101,28 +107,19 @@ class YuGiOhHandSimulator(ctk.CTk):
     def load_deck(self, ydk_code: str):
         """Load deck from YDK file or ydke URL"""
         self.deck.clear_deck()
+        self.deck_loaded = False
         self.card_pool = []
         self._set_manual_tags(None)
 
         try:
-            try:
-                card_ids = extract_main_deck_ids(ydk_code)
-            except DeckParseError as e:
-                messagebox.showerror("Error", str(e))
-                return
-
-            # Fetch card names
             self.counts_panel.set_status("Loading card names from API...", "yellow")
             self.update()
-            card_database = fetch_multiple_card_names(list(set(card_ids)), verbose=False)
-
-            # Count cards and remember each name's card ID (for image lookup)
-            card_counts, card_id_map = count_cards(card_ids, card_database)
-            self.card_id_map.update(card_id_map)
             try:
-                fill_deck(self.deck, card_counts)
-            except TooManyCopiesError as e:
+                # Remember each name's card ID (for image lookup)
+                self.card_id_map.update(load_main_deck(self.deck, ydk_code))
+            except (DeckParseError, TooManyCopiesError) as e:
                 messagebox.showerror("Error", str(e))
+                self.counts_panel.set_status("Failed to load deck", "red")
                 return
 
             self.deck_loaded = True
@@ -266,6 +263,33 @@ class YuGiOhHandSimulator(ctk.CTk):
         if self.manual_tags is None:
             self.counts_panel.reset_counts()
 
+    # "Compare Decks"
+
+    def open_compare_view(self):
+        """Overlay the deck comparison on top of the main view.
+
+        The first time, Deck 1 starts as this deck. Closing only hides the overlay, so
+        both decks and their counts/tags are still there when it's opened again.
+        """
+        if self._compare_overlay is None:
+            self._compare_overlay = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+            self._compare_overlay.grid_rowconfigure(0, weight=1)
+            self._compare_overlay.grid_columnconfigure(0, weight=1)
+            self.compare_view = CompareView(self._compare_overlay, self.image_loader,
+                                            on_close=self._close_compare_view)
+            self.compare_view.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+            if self.deck_loaded:
+                try:
+                    counts = self.counts_panel.get_counts()
+                except ValueError:
+                    counts = (0, 0, 0)
+                self.compare_view.setups[0].copy_from(self.deck, self.card_id_map,
+                                                      self.manual_tags, counts)
+        self._compare_overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        self._compare_overlay.lift()
+
+    def _close_compare_view(self):
+        self._compare_overlay.place_forget()
 
 def main():
     app = YuGiOhHandSimulator()
