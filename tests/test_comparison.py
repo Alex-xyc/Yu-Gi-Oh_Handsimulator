@@ -53,7 +53,7 @@ class TestComparison(unittest.TestCase):
         deck_1 = DeckSummary("Deck 1", make_pool(12, 9, 4))
         deck_2 = DeckSummary("Deck 2", make_pool(15, 9, 2))
         report = format_comparison(deck_1, deck_2)
-        self.assertIn("going first: 5 cards", report)
+        self.assertIn("DECK COMPARISON (going first)", report)
         engine_line = next(line for line in report.splitlines() if "At least 1 engine" in line)
         self.assertTrue(engine_line.rstrip().endswith("Deck 2"))
         brick_line = next(line for line in report.splitlines() if "At least 1 brick" in line)
@@ -62,7 +62,7 @@ class TestComparison(unittest.TestCase):
     def test_identical_decks_have_no_diffs(self):
         pool = make_pool(12, 9, 4)
         report = format_comparison(DeckSummary("Deck 1", pool), DeckSummary("Deck 2", pool), 6)
-        self.assertIn("going second: 6 cards", report)
+        self.assertIn("DECK COMPARISON (going second)", report)
         self.assertNotIn("Different between the decks", report)
         self.assertNotRegex(report, r"[+-]\d")
 

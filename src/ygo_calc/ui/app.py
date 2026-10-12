@@ -30,7 +30,7 @@ from .advanced_view import AdvancedDeckView
 from .compare_view import CompareView
 from .counts_panel import CountsPanel
 from .deck_input_panel import DeckInputPanel
-from .deck_loading import load_main_deck
+from ..deck_loading import load_main_deck
 from .hand_panel import HandPanel
 from .image_loader import ImageLoader
 from .split_view import SplitView
