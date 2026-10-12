@@ -12,7 +12,7 @@ import ctypes
 import random
 import urllib.request
 from io import BytesIO
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -35,7 +35,7 @@ from main import (
     hypergeometric_probability,
     probability_at_least,
     comb,
-    get_image_cache
+    get_card_image_urls
 )
 
 
@@ -108,6 +108,9 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.deck = YuGiOhDeck()
         self.deck_loaded = False
         self.current_hand = []
+        self.current_hand_categories: List[str] = []
+        # One (card_name, category) entry per copy in the deck
+        self.card_pool: List[Tuple[str, str]] = []
         self.card_id_map: Dict[str, str] = {}  # card_name -> card_id
         self.image_cache: Dict[str, ImageTk.PhotoImage] = {}  # Cache loaded images (keyed by url|WxH)
         self.orig_images: Dict[str, 'Image.Image'] = {}  # Store original PIL images by URL
@@ -494,6 +497,7 @@ class YuGiOhHandSimulator(ctk.CTk):
     def load_deck(self, ydk_code: str):
         """Load deck from YDK file or ydke URL"""
         self.deck.clear_deck()
+        self.card_pool = []
         ydk_code = ydk_code.strip()
 
         try:
@@ -597,52 +601,48 @@ class YuGiOhHandSimulator(ctk.CTk):
             messagebox.showerror("Error", "Card counts cannot be negative.")
             return
 
-        # Assign categories
-        card_list = list(self.deck.cards.keys())
+        # Assign categories per copy, in deck-list order, so the entered counts are
+        # met exactly even when a card's copies span two categories
+        categories = (["brick"] * brick_count + ["non_engine"] * non_engine_count
+                      + ["engine"] * engine_count)
+        deck_list = self.deck.get_deck_list()
+        categories += [""] * (len(deck_list) - len(categories))
+        self.card_pool = list(zip(deck_list, categories))
+
         self.deck.engine_cards.clear()
         self.deck.non_engine_cards.clear()
         self.deck.brick_cards.clear()
-
-        remaining = brick_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            copies = self.deck.cards[card_name]
-            if copies <= remaining:
-                self.deck.brick_cards.add(card_name)
-            remaining -= copies
-
-        remaining = non_engine_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            if card_name in self.deck.brick_cards:
-                continue
-            copies = self.deck.cards[card_name]
-            if copies <= remaining:
-                self.deck.non_engine_cards.add(card_name)
-            remaining -= copies
-
-        remaining = engine_count
-        for card_name in card_list:
-            if remaining <= 0:
-                break
-            if card_name in self.deck.brick_cards or card_name in self.deck.non_engine_cards:
-                continue
-            copies = self.deck.cards[card_name]
-            if copies <= remaining:
-                self.deck.engine_cards.add(card_name)
-            remaining -= copies
+        category_sets = {"brick": self.deck.brick_cards, "non_engine": self.deck.non_engine_cards,
+                         "engine": self.deck.engine_cards}
+        for card_name, category in self.card_pool:
+            if category:
+                category_sets[category].add(card_name)
 
         # draw_again button removed; rely on the main Apply & Draw Hand button
         self.draw_hand()
 
+    def _pool_from_category_sets(self) -> List[Tuple[str, str]]:
+        """Build a per-copy card pool from the deck's per-name category sets."""
+        pool = []
+        for card_name, copies in self.deck.cards.items():
+            if card_name in self.deck.brick_cards:
+                category = "brick"
+            elif card_name in self.deck.non_engine_cards:
+                category = "non_engine"
+            elif card_name in self.deck.engine_cards:
+                category = "engine"
+            else:
+                category = ""
+            pool.extend([(card_name, category)] * copies)
+        return pool
+
     def draw_hand(self):
         """Draw a test hand and display results"""
         # Draw hand
-        full_deck = self.deck.get_deck_list()
-        random.shuffle(full_deck)
-        self.current_hand = full_deck[:5]
+        pool = list(self.card_pool or self._pool_from_category_sets())
+        random.shuffle(pool)
+        self.current_hand = [name for name, _ in pool[:5]]
+        self.current_hand_categories = [category for _, category in pool[:5]]
 
         # Clear previous card images
         for widget in self.cards_frame.winfo_children():
@@ -651,10 +651,8 @@ class YuGiOhHandSimulator(ctk.CTk):
 
         # Display card images
         if PIL_AVAILABLE:
-            image_cache = get_image_cache()
             for i, card in enumerate(self.current_hand):
-                card_id = self.card_id_map.get(card, '')
-                image_url = image_cache.get(card_id, '')
+                image_urls = get_card_image_urls(self.card_id_map.get(card, ''))
 
                 # Create frame for each card (padding around thumbnail)
                 card_frame = ctk.CTkFrame(self.cards_frame, fg_color=self.bg_color, corner_radius=6)
@@ -670,29 +668,16 @@ class YuGiOhHandSimulator(ctk.CTk):
                 except Exception:
                     thumb_w, thumb_h = 140, 205
 
-                if image_url:
-                    self.load_and_display_image(image_url, card_frame, card, target_size=(thumb_w, thumb_h))
-                else:
-                    # Fallback to text label sized to match thumbnails
-                    label = ctk.CTkLabel(card_frame, text=card[:15], width=thumb_w, height=thumb_h,
-                                         fg_color="gray30", corner_radius=5)
-                    label.grid(row=0, column=0)
+                self.load_and_display_image(image_urls, card_frame, card, target_size=(thumb_w, thumb_h))
 
-        # 6th card simulation
-        temp_deck = full_deck.copy()
-        for card in self.current_hand:
-            if card in temp_deck:
-                temp_deck.remove(card)
-
+        # 6th card simulation (next card of the shuffled deck)
         sixth_card = None
-        if temp_deck:
-            sixth_card = random.choice(temp_deck)
+        if len(pool) > 5:
+            sixth_card = pool[5][0]
 
             # Show 6th card image
             if PIL_AVAILABLE:
-                image_cache = get_image_cache()
-                card_id = self.card_id_map.get(sixth_card, '')
-                image_url = image_cache.get(card_id, '')
+                image_urls = get_card_image_urls(self.card_id_map.get(sixth_card, ''))
 
                 # Separator
                 sep_label = ctk.CTkLabel(self.cards_frame, text="→", font=ctk.CTkFont(size=26))
@@ -709,12 +694,7 @@ class YuGiOhHandSimulator(ctk.CTk):
                 except Exception:
                     thumb_w, thumb_h = 140, 205
 
-                if image_url:
-                    self.load_and_display_image(image_url, card_frame, sixth_card, is_sixth=True, target_size=(thumb_w, thumb_h))
-                else:
-                    label = ctk.CTkLabel(card_frame, text=sixth_card[:15], width=thumb_w, height=thumb_h,
-                                         fg_color="gray30", corner_radius=5)
-                    label.grid(row=0, column=0)
+                self.load_and_display_image(image_urls, card_frame, sixth_card, is_sixth=True, target_size=(thumb_w, thumb_h))
 
         # Display hand text
         self.hand_textbox.configure(state="normal")
@@ -732,45 +712,45 @@ class YuGiOhHandSimulator(ctk.CTk):
         # Calculate and display statistics
         self.display_statistics()
 
-    def load_and_display_image(self, url: str, parent_frame, card_name: str, is_sixth: bool = False, target_size: tuple = None):
-        """Load image from URL and display it"""
-        try:
-            # Determine target size
-            if target_size and isinstance(target_size, tuple) and len(target_size) == 2:
-                tw, th = target_size
-            else:
-                tw, th = (140, 205)
+    def _get_image(self, url: str, tw: int, th: int):
+        """Download (or reuse) an image and return it resized as a PhotoImage."""
+        # Use cache key that includes size to avoid mismatched thumbnail sizes
+        cache_key = f"{url}|{tw}x{th}"
+        if cache_key in self.image_cache:
+            return self.image_cache[cache_key]
 
-            # Use cache key that includes size to avoid mismatched thumbnail sizes
-            cache_key = f"{url}|{tw}x{th}"
+        orig = self.orig_images.get(url)
+        if orig is None:
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
+            with urllib.request.urlopen(req, timeout=10) as response:
+                image_data = response.read()
+            # Open original PIL image and store it for future resizes
+            orig = Image.open(BytesIO(image_data)).convert("RGBA")
+            self.orig_images[url] = orig
 
-            # Check if already cached for this size
-            if cache_key in self.image_cache:
-                img_tk = self.image_cache[cache_key]
-            else:
-                # Download image
-                req = urllib.request.Request(url)
-                req.add_header('User-Agent', 'Mozilla/5.0 YGO-Calculator/1.0')
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    image_data = response.read()
+        img_tk = ImageTk.PhotoImage(orig.resize((tw, th), Image.Resampling.LANCZOS))
+        self.image_cache[cache_key] = img_tk
+        return img_tk
 
-                # Open original PIL image and store it for future resizes
-                orig = Image.open(BytesIO(image_data)).convert("RGBA")
-                self.orig_images[url] = orig
+    def load_and_display_image(self, urls: List[str], parent_frame, card_name: str, is_sixth: bool = False, target_size: tuple = None):
+        """Display the first image that loads from urls; otherwise show the card name."""
+        if target_size and isinstance(target_size, tuple) and len(target_size) == 2:
+            tw, th = target_size
+        else:
+            tw, th = (140, 205)
 
-                # Resize from original to requested thumbnail
-                img = orig.resize((tw, th), Image.Resampling.LANCZOS)
-                img_tk = ImageTk.PhotoImage(img)
-                self.image_cache[cache_key] = img_tk
+        for url in urls:
+            try:
+                img_tk = self._get_image(url, tw, th)
+            except Exception:
+                logging.warning("Failed to load image for %s from %s", card_name, url)
+                continue
 
-            # Create label with image
             label = ctk.CTkLabel(parent_frame, image=img_tk, text="")
             label.image = img_tk  # Keep reference
             # Tag label with source url for responsive resizing
-            try:
-                label._image_url = url
-            except Exception:
-                pass
+            label._image_url = url
             label.grid(row=0, column=0)
             # Add subtle border to image
             try:
@@ -778,16 +758,12 @@ class YuGiOhHandSimulator(ctk.CTk):
             except Exception:
                 pass
             self.card_image_labels.append(label)
+            return
 
-        except Exception as e:
-            # Fallback to text (smaller placeholder to match thumbnails)
-            try:
-                tw, th = (tw, th)
-            except Exception:
-                tw, th = (140, 205)
-            label = ctk.CTkLabel(parent_frame, text=card_name[:12], width=tw, height=th,
-                                 fg_color="gray30", corner_radius=5)
-            label.grid(row=0, column=0)
+        # No image source worked: show the card name instead
+        label = ctk.CTkLabel(parent_frame, text=card_name, width=tw, height=th,
+                             wraplength=tw - 12, fg_color="gray30", corner_radius=5)
+        label.grid(row=0, column=0)
 
     def draw_again(self):
         """Draw another hand"""
@@ -830,9 +806,10 @@ class YuGiOhHandSimulator(ctk.CTk):
     def display_statistics(self):
         """Calculate and display probability statistics"""
         deck_size = self.deck.get_deck_size()
-        engine_count = sum(self.deck.cards[c] for c in self.deck.engine_cards)
-        non_engine_count = sum(self.deck.cards[c] for c in self.deck.non_engine_cards)
-        brick_count = sum(self.deck.cards[c] for c in self.deck.brick_cards)
+        pool = self.card_pool or self._pool_from_category_sets()
+        engine_count = sum(1 for _, category in pool if category == "engine")
+        non_engine_count = sum(1 for _, category in pool if category == "non_engine")
+        brick_count = sum(1 for _, category in pool if category == "brick")
         hand_size = 5
 
         self.stats_textbox.configure(state="normal")
@@ -914,9 +891,9 @@ class YuGiOhHandSimulator(ctk.CTk):
         self.stats_textbox.insert("end", "6TH CARD ODDS (based on current hand)\n\n")
 
         remaining_deck = deck_size - 5
-        engine_in_hand = sum(1 for c in self.current_hand if c in self.deck.engine_cards)
-        non_engine_in_hand = sum(1 for c in self.current_hand if c in self.deck.non_engine_cards)
-        brick_in_hand = sum(1 for c in self.current_hand if c in self.deck.brick_cards)
+        engine_in_hand = self.current_hand_categories.count("engine")
+        non_engine_in_hand = self.current_hand_categories.count("non_engine")
+        brick_in_hand = self.current_hand_categories.count("brick")
 
         engine_remaining = engine_count - engine_in_hand
         non_engine_remaining = non_engine_count - non_engine_in_hand
