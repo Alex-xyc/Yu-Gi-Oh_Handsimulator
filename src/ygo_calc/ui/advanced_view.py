@@ -16,28 +16,29 @@ from typing import Callable, Dict, List, Optional
 
 import customtkinter as ctk
 
-try:
+from ..core.categories import BRICK, ENGINE, NON_ENGINE, UNTAGGED
+from . import theme
+from .image_loader import PIL_AVAILABLE
+
+if PIL_AVAILABLE:
     from PIL import Image, ImageTk
-    PIL_AVAILABLE = True
-except ImportError:
-    PIL_AVAILABLE = False
 
 
 # Tag key -> (label, tint colour)
 TAGS = {
-    "brick": ("Brick", "#dc2626"),
-    "non_engine": ("Non-Engine", "#eab308"),
-    "engine": ("Engine", "#16a34a"),
+    BRICK: ("Brick", "#dc2626"),
+    NON_ENGINE: ("Non-Engine", "#eab308"),
+    ENGINE: ("Engine", "#16a34a"),
 }
-UNTAG = ""
+UNTAG = UNTAGGED
 TINT_OPACITY = 0.45
 
 CARD_W, CARD_H = 140, 205  # Card aspect ratio
 GAP = 6
 BORDER = 2  # Tag-coloured border around each tile
 TILE_EXTRA = GAP + 2 * BORDER  # Pixels each tile takes beyond the card image
-BG = "#23272b"
-UNTAGGED_TEXT_BG = "gray30"
+BG = theme.CARD_AREA_BG
+UNTAGGED_TEXT_BG = theme.CARD_PLACEHOLDER_BG
 
 
 class AdvancedDeckView(ctk.CTkFrame):
@@ -73,7 +74,7 @@ class AdvancedDeckView(ctk.CTkFrame):
         self._image_queue: "queue.Queue" = queue.Queue()
         self._closed = False
 
-        self.tool = ctk.StringVar(value="brick")
+        self.tool = ctk.StringVar(value=BRICK)
         self.all_copies = ctk.BooleanVar(value=True)
 
         self._build()
@@ -174,7 +175,7 @@ class AdvancedDeckView(ctk.CTkFrame):
         self.bulk_buttons = []
         for key, (label, colour) in TAGS.items():
             button = ctk.CTkButton(bulk_bar, text=label, width=110, fg_color=colour,
-                                   hover_color=colour, text_color="black" if key == "non_engine" else "white",
+                                   hover_color=colour, text_color="black" if key == NON_ENGINE else "white",
                                    font=ctk.CTkFont(size=13, weight="bold"),
                                    command=lambda k=key: self.tag_untagged(k))
             button.pack(side="left", padx=6)

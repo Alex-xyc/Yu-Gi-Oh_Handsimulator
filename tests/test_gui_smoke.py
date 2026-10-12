@@ -9,8 +9,8 @@ SRC_PATH = os.path.join(ROOT, 'src')
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
-import main
-import gui
+from ygo_calc.core.deck import YuGiOhDeck
+from ygo_calc.ui.app import YuGiOhHandSimulator
 
 class TestGUISmoke(unittest.TestCase):
     def setUp(self):
@@ -23,10 +23,10 @@ class TestGUISmoke(unittest.TestCase):
 
     def test_instantiate_and_draw_hand(self):
         # Create app but do not run mainloop; perform programmatic calls
-        app = gui.YuGiOhHandSimulator()
+        app = YuGiOhHandSimulator()
         try:
             # Build a larger deck programmatically (avoid zero remaining_deck)
-            deck = main.YuGiOhDeck()
+            deck = YuGiOhDeck()
             # Add a few engines/non-engines and fill the rest with bricks to reach 40
             deck.add_card('CardA', 3)
             deck.add_card('CardB', 2)
@@ -48,7 +48,7 @@ class TestGUISmoke(unittest.TestCase):
             app.draw_hand()
             self.assertTrue(len(app.current_hand) <= 5)
             # Ensure stats textbox was populated
-            content = app.stats_textbox.get('1.0', 'end').strip()
+            content = app.stats_panel.textbox.get('1.0', 'end').strip()
             self.assertIn('OPENING HAND PROBABILITIES', content)
         finally:
             # Clean up Tk root created by CTk

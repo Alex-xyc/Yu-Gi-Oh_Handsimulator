@@ -6,9 +6,41 @@ This application is an opening-hand simulator and probability calculator for Yu-
 
 What this repository contains
 
-- A simple GUI (CustomTkinter) to load decks and draw test hands (`src/gui.py`).
-- Deck parsing and probability utilities (`src/main.py`).
-- Example decklists in `src/decklists/` and icon assets in `src/icons/`.
+```
+src/
+  gui.py                  Starts the desktop app (also the PyInstaller entry script)
+  main.py                 Starts the console version
+  decklists/  icons/      Example decks and the app icon
+  ygo_calc/
+    paths.py              Where icons/decklists live (source checkout or .exe)
+    core/                 Pure logic, no UI or network code
+      deck.py               YuGiOhDeck
+      deck_parser.py        Card IDs from ydke:// codes and .ydk files
+      deck_builder.py       Building a deck from card IDs + names
+      categories.py         Brick / non-engine / engine tags per card copy
+      probability.py        Hypergeometric maths
+      simulation.py         Drawing hands
+      report.py             The "Probabilities & Statistics" text
+    cards/                Card names and images
+      ygoprodeck.py         YGOPRODeck API (primary)
+      edopro.py             EDOPro card databases (fallback)
+      images.py             Which image URLs to try for a card
+      cache.py  http.py     Shared caches and HTTP helpers
+    ui/                   The desktop app
+      app.py                Main window: builds the panels and wires up the deck state
+      deck_input_panel.py   ydke code / .ydk file loading
+      counts_panel.py       Category counts, buttons and deck status
+      hand_panel.py         Test hand: card images and the text under them
+      stats_panel.py        Probabilities & statistics
+      split_view.py         Resizable split between the two panels (with drag preview)
+      advanced_view.py      "Show Decklist" overlay for tagging cards
+      text_layout.py        Deck-list columns and text font fitting
+      image_loader.py       Downloading and resizing card images
+      window.py  theme.py   Window setup helpers, colours and fonts
+    cli/
+      console.py            The console simulator
+tests/                    Unit tests (python -m unittest discover -s tests)
+```
 
 Quick start
 
@@ -23,6 +55,8 @@ python -m pip install -r requirements.txt
 ```bash
 python src/gui.py
 ```
+
+Or the console version: `python src/main.py`
 
 Notes
 
