@@ -22,6 +22,8 @@ from .image_loader import PIL_AVAILABLE
 
 if PIL_AVAILABLE:
     from PIL import Image, ImageTk
+else:
+    Image = ImageTk = None  # pylint: disable=invalid-name
 
 
 # Tag key -> (label, tint colour)
@@ -65,6 +67,7 @@ class AdvancedDeckView(ctk.CTkFrame):
             self.scale = 1.0
         # Provisional size; the grid is refitted to its real area once laid out
         self.columns = 10
+        self._blank: Optional[tk.PhotoImage] = None
         self._set_card_size(int(CARD_H * self.scale * 0.6))
         self._resize_job = None
 
@@ -306,7 +309,7 @@ class AdvancedDeckView(ctk.CTkFrame):
         else:
             # No image (yet): show the card name on a tag-coloured background.
             # A blank image makes tk size the label in pixels, matching image tiles.
-            if not hasattr(self, "_blank"):
+            if self._blank is None:
                 self._blank = tk.PhotoImage(width=1, height=1)
             tile.configure(image=self._blank, text=card_name, compound="center",
                            bg=colour or UNTAGGED_TEXT_BG)

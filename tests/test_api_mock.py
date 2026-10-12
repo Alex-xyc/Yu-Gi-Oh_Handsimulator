@@ -1,8 +1,7 @@
 import os
 import sys
 import unittest
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # ensure src is importable
 ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -14,21 +13,31 @@ import tempfile
 
 import card_cache
 import main
+from ygo_calc.cards import cache
+
+
+def mock_api(fake_data):
+    """Patch the YGOPRODeck request and the EDOPro fallback so no network is used."""
+    api = patch('ygo_calc.cards.ygoprodeck.fetch_json', return_value=fake_data)
+    edopro = patch('ygo_calc.cards.ygoprodeck.fetch_edopro_card_names', return_value={})
+    return api, edopro
+
 
 class TestAPIMock(unittest.TestCase):
     def setUp(self):
         # Use an empty cache so the tests exercise the (mocked) API, not files on disk
-        self._tmp = tempfile.TemporaryDirectory()
-        self._env = patch.dict(os.environ, {'YGO_CACHE_DIR': self._tmp.name})
+        tmp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        self.addCleanup(tmp.cleanup)
+        self._env = patch.dict(os.environ, {'YGO_CACHE_DIR': tmp.name})
         self._env.start()
         card_cache._db = None
         card_cache._edopro = None
-        main._card_name_cache.clear()
-        main._card_image_cache.clear()
+        cache.names.clear()
+        cache.image_urls.clear()
+        cache.aliases.clear()
 
     def tearDown(self):
         self._env.stop()
-        self._tmp.cleanup()
         card_cache._db = None
         card_cache._edopro = None
 
@@ -40,19 +49,8 @@ class TestAPIMock(unittest.TestCase):
                 {"id": 200, "name": "Beta", "card_images": [{"image_url_small": "http://img/beta_small.png"}]}
             ]
         }
-        fake_bytes = json.dumps(fake_data).encode('utf-8')
-
-        class FakeResp:
-            def __init__(self, data):
-                self._data = data
-            def read(self):
-                return self._data
-            def __enter__(self):
-                return self
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        with patch('urllib.request.urlopen', return_value=FakeResp(fake_bytes)) as m:
+        api, edopro = mock_api(fake_data)
+        with api, edopro:
             res = main.fetch_multiple_card_names(['100', '200'], verbose=False)
             # verify mapping and that cache was populated
             self.assertIn('100', res)
@@ -61,21 +59,10 @@ class TestAPIMock(unittest.TestCase):
 
     def test_fetch_multiple_card_names_empty(self):
         # If API returns empty data, function should return {} and not crash
-        fake_data = {"data": []}
-        fake_bytes = json.dumps(fake_data).encode('utf-8')
-        class FakeResp:
-            def __init__(self, data):
-                self._data = data
-            def read(self):
-                return self._data
-            def __enter__(self):
-                return self
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        with patch('urllib.request.urlopen', return_value=FakeResp(fake_bytes)):
+        api, edopro = mock_api({"data": []})
+        with api, edopro:
             res = main.fetch_multiple_card_names(['999'], verbose=False)
-            self.assertIsInstance(res, dict)
+            self.assertEqual(res, {})
 
 if __name__ == '__main__':
     unittest.main()

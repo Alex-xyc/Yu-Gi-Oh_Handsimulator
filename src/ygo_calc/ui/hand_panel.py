@@ -283,9 +283,12 @@ class HandPanel(ctk.CTkFrame):
 
         if self._text_mode == "deck" and self._text_deck is not None:
             deck = self._text_deck
-            lines_for = lambda font: deck_list_lines(deck, avail_w // max(1, font.measure("0")))
+
+            def lines_for(font):
+                return deck_list_lines(deck, avail_w // max(1, font.measure("0")))
         else:
-            lines_for = lambda font: self._text_lines
+            def lines_for(_font):
+                return self._text_lines
         size, lines = fit_font_size(
             lines_for, lambda size: tkfont.Font(family=theme.MONO_FONT, size=size),
             avail_w, avail_h, self.FONT_MIN, self.FONT_MAX)

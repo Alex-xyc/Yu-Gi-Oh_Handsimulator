@@ -76,7 +76,7 @@ def apply_window_icon(window: tk.Tk) -> None:
 
 
 def set_default_geometry(window: ctk.CTk, default_size: Tuple[int, int], min_size: Tuple[int, int],
-                         maximize: Callable[[], None]) -> None:
+                         on_maximize: Callable[[], None]) -> None:
     """Open centred at default_size, or maximized if the screen is too small for it."""
     scale = window_scaling(window)
     screen_w = int(window.winfo_screenwidth() / scale)
@@ -93,7 +93,7 @@ def set_default_geometry(window: ctk.CTk, default_size: Tuple[int, int], min_siz
     else:
         window.geometry(f"{min(width, avail_w)}x{min(height, avail_h)}+20+20")
         # CTk applies its own startup geometry, so maximize once the window is up
-        window.after(0, maximize)
+        window.after(0, on_maximize)
 
 
 def maximize(window: tk.Tk) -> None:

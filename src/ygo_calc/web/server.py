@@ -72,7 +72,7 @@ class DeckSetup(BaseModel):
             try:
                 deck.add_card(card.name, deck.cards.get(card.name, 0) + card.copies)
             except ValueError as e:
-                raise HTTPException(400, str(e).removeprefix("Error: "))
+                raise HTTPException(400, str(e).removeprefix("Error: ")) from e
         if deck.get_deck_size() > YuGiOhDeck.MAX_DECK_SIZE:
             raise HTTPException(400, f"Decks can have at most {YuGiOhDeck.MAX_DECK_SIZE} cards.")
         return deck
@@ -124,7 +124,7 @@ def load_deck(body: DeckCode):
     try:
         card_ids = load_main_deck(deck, body.code)
     except (DeckParseError, TooManyCopiesError) as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     cards = [{"name": name, "id": card_ids.get(name, ""), "copies": copies}
              for name, copies in deck.cards.items()]
     return {"cards": cards, "size": deck.get_deck_size()}
@@ -177,4 +177,3 @@ def card_image(card_id: str, size: Literal["small", "full"] = "small"):
 
 if os.path.isdir(WEB_DIST):
     app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
-

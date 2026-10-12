@@ -4,7 +4,7 @@ from typing import Dict, List, NamedTuple, Optional
 
 from .categories import BRICK, ENGINE, NON_ENGINE, CardPool, count_categories
 from .probability import probability_at_least
-from .stats import HAND_ODDS, HandOdds, opening_stats, pool_hand_odds  # noqa: F401 (HandOdds re-exported)
+from .stats import HAND_ODDS, HandOdds, opening_stats, pool_hand_odds  # noqa: F401 (HandOdds re-exported)  # pylint: disable=unused-import
 
 LABEL_W = 30
 COL_W = 10

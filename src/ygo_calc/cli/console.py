@@ -11,7 +11,7 @@ from ..core.deck import YuGiOhDeck
 from ..core.deck_builder import TooManyCopiesError, count_cards, fill_deck
 from ..core.deck_parser import parse_ydk_main_ids, parse_ydke_url
 from ..core.probability import calculate_6th_card_odds, calculate_probabilities
-from ..core.simulation import analyze_hand, draw_test_hand, simulate_6th_card
+from ..core.simulation import draw_test_hand, simulate_6th_card
 from ..paths import source_decklists_dir
 
 
@@ -66,8 +66,6 @@ def load_ydk_code(deck: YuGiOhDeck, ydk_code: str, use_api: bool = True) -> bool
 
 def display_results(deck: YuGiOhDeck, hand: List[str], probs: Dict) -> None:
     """Display test hand results."""
-    analysis = analyze_hand(deck, hand)
-
     print("\n" + "=" * 60)
     print("TEST HAND RESULTS")
     print("=" * 60)
@@ -78,16 +76,17 @@ def display_results(deck: YuGiOhDeck, hand: List[str], probs: Dict) -> None:
 
     # 6th Card Analysis (Going Second)
     sixth_odds = calculate_6th_card_odds(deck, hand)
-    sixth_card, sixth_category = simulate_6th_card(deck, hand)
+    sixth_card, _ = simulate_6th_card(deck, hand)
 
     print("\n" + "-" * 60)
     print("6TH CARD (GOING SECOND)")
     print("-" * 60)
     print(f"\nSimulated Draw: {sixth_card}")
-    print(f"\nOdds for 6th card:")
-    print(f"  Engine:      {sixth_odds['engine_prob']*100:.1f}% ({sixth_odds['engine_remaining']}/{sixth_odds['remaining_deck']} remaining)")
-    print(f"  Non-Engine:  {sixth_odds['non_engine_prob']*100:.1f}% ({sixth_odds['non_engine_remaining']}/{sixth_odds['remaining_deck']} remaining)")
-    print(f"  Brick:       {sixth_odds['brick_prob']*100:.1f}% ({sixth_odds['brick_remaining']}/{sixth_odds['remaining_deck']} remaining)")
+    print("\nOdds for 6th card:")
+    remaining = sixth_odds['remaining_deck']
+    print(f"  Engine:      {sixth_odds['engine_prob']*100:.1f}% ({sixth_odds['engine_remaining']}/{remaining} remaining)")
+    print(f"  Non-Engine:  {sixth_odds['non_engine_prob']*100:.1f}% ({sixth_odds['non_engine_remaining']}/{remaining} remaining)")
+    print(f"  Brick:       {sixth_odds['brick_prob']*100:.1f}% ({sixth_odds['brick_remaining']}/{remaining} remaining)")
 
     # Opening Hand Probability Matrix
     print("\n" + "-" * 60)
@@ -108,9 +107,9 @@ def display_results(deck: YuGiOhDeck, hand: List[str], probs: Dict) -> None:
                 if prob > 0:
                     print(f"{prob:6.1f}%  ", end="")
                 else:
-                    print(f"    -    ", end="")
+                    print("    -    ", end="")
             else:
-                print(f"    -    ", end="")
+                print("    -    ", end="")
         print()
 
     print("\n'At Least' Probabilities (chance of drawing X OR MORE of a category):")
@@ -167,7 +166,7 @@ def load_ydk_file(filename: str) -> str:
     decklist_path = source_decklists_dir()
     filepath = os.path.join(decklist_path, filename)
 
-    with open(filepath, 'r') as f:
+    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
         return f.read()
 
 

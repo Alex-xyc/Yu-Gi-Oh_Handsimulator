@@ -110,7 +110,23 @@ visitor rather than to the proxy. The Docker image runs as an unprivileged user.
 
 Notes
 
-- The project is licensed under the MIT License — see the `LICENSE` file.
+- The project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) — see the `LICENSE` file.
+
+```
+Copyright (C) 2026 Alex-xyc
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
   
 Ownership
 This project and its source code are authored and maintained by Alex-xyc. See `LICENSE` for permitted uses.

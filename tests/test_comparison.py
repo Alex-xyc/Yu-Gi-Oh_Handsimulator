@@ -26,7 +26,7 @@ class TestCategoryProbability(unittest.TestCase):
     def test_matches_single_category(self):
         for k in (1, 2, 3):
             self.assertAlmostEqual(
-                category_probability(40, (12, 9, 4), 5, lambda d: d[0] >= k),
+                category_probability(40, (12, 9, 4), 5, lambda d, k=k: d[0] >= k),
                 probability_at_least(40, 12, 5, k))
 
     def test_matches_engine_non_engine_matrix(self):

@@ -208,7 +208,7 @@ def get_db_nowait() -> Optional[Dict[str, Dict[str, str]]]:
     already running in the background.
     """
     global _db
-    if _db is not None or not _db_lock.acquire(blocking=False):
+    if _db is not None or not _db_lock.acquire(blocking=False):  # pylint: disable=consider-using-with
         return _db
     try:
         if _db is None:

@@ -240,7 +240,7 @@ class CompareView(ctk.CTkFrame):
                 messagebox.showerror("Error", f"{setup.name}: {e}", parent=self)
                 return
         hand_size = HAND_SIZES[self.hand_choice.get()]
-        self._show_results(format_comparison(*summaries, hand_size=hand_size))
+        self._show_results(format_comparison(summaries[0], summaries[1], hand_size=hand_size))
         self._compared = True
 
     def _recalculate(self):

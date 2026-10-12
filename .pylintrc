@@ -1,0 +1,37 @@
+[MAIN]
+# Old Tk front end, replaced by ygo_calc.ui and no longer imported anywhere
+ignore=gui_components
+
+[FORMAT]
+max-line-length=130
+
+[BASIC]
+# Allow private module-level state such as card_cache._db
+const-rgx=(([A-Z_][A-Z0-9_]*)|(_[a-z][a-z0-9_]*)|(__.*__))$
+
+[MESSAGES CONTROL]
+disable=
+    # Docstrings are written where they help, not on every function
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    # Card lookups and the UI fall back on any error rather than crash
+    broad-exception-caught,
+    # Tests add src/ to sys.path before importing; optional deps (PIL, openpyxl) load lazily
+    wrong-import-position,
+    import-outside-toplevel,
+    # Tests reset module caches directly
+    protected-access,
+    # card_cache keeps lazily opened databases in module globals
+    global-statement,
+    # Size/complexity limits don't fit the Tk views and report builders
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-locals,
+    too-many-statements,
+    too-many-branches,
+    too-many-return-statements,
+    too-many-instance-attributes,
+    too-many-ancestors,
+    too-few-public-methods,
+    duplicate-code,

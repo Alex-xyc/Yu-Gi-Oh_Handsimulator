@@ -21,7 +21,7 @@ from ygo_calc.core.probability import probability_at_least
 YDK = "#main\n" + "\n".join(["100"] * 3 + ["200"] * 2 + [str(300 + i) for i in range(35)]) + "\n#extra\n!side\n"
 
 
-def fake_names(card_ids, verbose=True):
+def fake_names(card_ids, verbose=True):  # pylint: disable=unused-argument
     return {cid: f"Card {cid}" for cid in card_ids}
 
 
