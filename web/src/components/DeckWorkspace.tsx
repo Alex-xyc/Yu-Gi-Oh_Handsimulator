@@ -85,8 +85,9 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
       </section>
 
       {/* Left: labelling controls above the test hand. Right: only the decklist, which fills
-          the left column's height (h-0 + min-h-full) and scrolls inside it. */}
-      <div className="grid gap-4 lg:grid-cols-2">
+          the left column's height (h-0 + min-h-full) and scrolls inside it. The decklist gets
+          the wider column so its 10-card rows stay a readable size. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <section className="card-panel flex min-w-0 flex-col gap-5" aria-labelledby={`${id}-label`}>
           <div>
             <SectionHeader as="h2" id={`${id}-label`} title="Label your decklist" />
