@@ -19,7 +19,24 @@
     font: 14px/1.5 var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+  html { overscroll-behavior-y: none; }
   h1, h2, h3, h4 { font-weight: 650; letter-spacing: -0.01em; color: var(--color-text); }
+
+  /* Slim, rounded scrollbars on a clear track, so a scrollbar never pokes out past a rounded
+     corner (Chrome, Edge, Safari). Chrome ignores these once scrollbar-width or scrollbar-color
+     is set on an element, so Firefox gets its own thin scrollbars below. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3) padding-box;
+    border: 2px solid transparent;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--color-faint); }
+  ::-webkit-scrollbar-button { display: none; }
+  @supports not selector(::-webkit-scrollbar) {
+    * { scrollbar-width: thin; scrollbar-color: var(--color-surface-3) transparent; }
+  }
   h2 { font-size: 15px; margin-bottom: 14px; }
   h3 { font-size: 13px; margin-bottom: 10px; }
 }

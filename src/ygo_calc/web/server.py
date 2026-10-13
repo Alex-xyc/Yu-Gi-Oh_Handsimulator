@@ -4,8 +4,10 @@ The server keeps no per-user state: the browser holds the deck and its tags or
 counts and sends them with each request.
 
     POST /api/decks                  deck code -> card list
+    POST /api/decks/info             card IDs -> each card's kind and level (for decks saved before
+                                     the card list had them)
     POST /api/stats                  deck setup -> opening-hand odds
-    POST /api/draw                   deck setup -> random hand + odds for it
+    POST /api/draw                   deck setup -> random hand, next draws, shuffled deck + odds for it
     POST /api/compare                two deck setups -> side-by-side odds
     GET  /api/cards/{id}/image       card image (cached on disk)
 
@@ -16,6 +18,7 @@ Copyright (c) 2026 Alex-xyc
 """
 
 import os
+import random
 import re
 from typing import List, Literal, Optional
 
@@ -24,12 +27,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from ..cards import fetch_card_infos
 from ..core.categories import CardPool, pool_from_counts, pool_from_tags
 from ..core.comparison import DeckSummary, compare_decks
 from ..core.deck import YuGiOhDeck
 from ..core.deck_builder import TooManyCopiesError
 from ..core.deck_parser import DeckParseError
-from ..core.simulation import draw_from_pool
 from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck
 from ..paths import SRC_DIR
@@ -119,15 +122,28 @@ CARD_ID = re.compile(r"[0-9]{1,10}")
 
 @app.post("/api/decks")
 def load_deck(body: DeckCode):
-    """Look up a ydke:// code or .ydk file text; returns the main deck in deck order."""
+    """Look up a ydke:// code or .ydk file text; returns the main deck in deck order, with each
+    card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for sorting."""
     deck = YuGiOhDeck()
     try:
         card_ids = load_main_deck(deck, body.code)
     except (DeckParseError, TooManyCopiesError) as e:
         raise HTTPException(400, str(e)) from e
-    cards = [{"name": name, "id": card_ids.get(name, ""), "copies": copies}
+    infos = fetch_card_infos([card_ids.get(name, "") for name in deck.cards])
+    cards = [{"name": name, "id": card_ids.get(name, ""), "copies": copies, **infos[card_ids.get(name, "")]}
              for name, copies in deck.cards.items()]
     return {"cards": cards, "size": deck.get_deck_size()}
+
+
+class CardIds(BaseModel):
+    ids: List[str] = Field(max_length=YuGiOhDeck.MAX_DECK_SIZE)
+
+
+@app.post("/api/decks/info")
+def card_infos(body: CardIds):
+    """Each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level."""
+    ids = [cid for cid in dict.fromkeys(body.ids) if CARD_ID.fullmatch(cid)]
+    return fetch_card_infos(ids)
 
 
 @app.post("/api/stats")
@@ -136,23 +152,25 @@ def stats(body: DeckSetup, hand_size: int = Query(5, ge=5, le=6)):
     return opening_stats(body.pool(), hand_size=hand_size, grouped=body.tagged)
 
 
+def _drawn(cards: CardPool) -> List[dict]:
+    return [{"name": name, "category": category} for name, category in cards]
+
+
 @app.post("/api/draw")
 def draw(body: DrawRequest):
-    """Shuffle and draw 5 cards plus the 6th (the next card); odds include the 6th-card odds
-    for this hand when the deck is tagged by card."""
+    """Shuffle and draw 5 cards, the 6th (the next card, going second) and the 4 cards after it
+    (extra draws), plus the whole shuffled deck in order; odds include the 6th-card odds for this
+    hand when the deck is tagged by card."""
     setup = body.deck
-    pool = setup.pool()
-    hand, categories, sixth = draw_from_pool(pool)
-    sixth_category = None
-    if sixth is not None:
-        # The 6th card is the first remaining copy of that name after the hand
-        remaining = list(pool)
-        for name, category in zip(hand, categories):
-            remaining.remove((name, category))
-        sixth_category = next(c for n, c in remaining if n == sixth)
+    pool = list(setup.pool())
+    deck = random.sample(pool, len(pool))
+    hand, after = deck[:5], deck[5:10]
+    categories = [c for _, c in hand]
     return {
-        "hand": [{"name": n, "category": c} for n, c in zip(hand, categories)],
-        "sixth": {"name": sixth, "category": sixth_category} if sixth else None,
+        "hand": _drawn(hand),
+        "sixth": _drawn(after[:1])[0] if after else None,
+        "draws": _drawn(after[1:]),
+        "deck": _drawn(deck),
         "stats": opening_stats(pool, categories if setup.tagged else None, grouped=setup.tagged),
     }
 

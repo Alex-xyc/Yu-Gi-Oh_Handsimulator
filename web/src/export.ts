@@ -136,6 +136,7 @@ export async function exportStats({ name, first, second, draw, labelled }: {
     row = addTable(sheet, row, "Test hand", ["Card", "Label"], ["text", "text"], [
       ...draw.hand.map((card): Cell[] => [card.name, card.category ? CATEGORY_LABELS[card.category] : ""]),
       ...(draw.sixth ? [[`6th card: ${draw.sixth.name}`, draw.sixth.category ? CATEGORY_LABELS[draw.sixth.category] : ""]] : []),
+      ...draw.draws.map((card, i): Cell[] => [`Draw ${i + 7}: ${card.name}`, card.category ? CATEGORY_LABELS[card.category] : ""]),
     ]);
   }
   const sixth = first.sixth_card;

@@ -1,6 +1,6 @@
 // One deck and the label (engine / non-engine / brick) of each card copy, set in the decklist view.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, Category, DeckCard, DeckSetupBody } from "./api";
 import { SavedDeck } from "./storage";
 
@@ -42,6 +42,16 @@ export function useDeckSetup(initial?: SavedDeck): DeckSetup {
     () => Object.fromEntries((cards ?? []).map((card) => [card.name, card.id])),
     [cards],
   );
+
+  // A deck saved before cards had a kind (for sorting) gets them looked up
+  useEffect(() => {
+    if (!cards?.some((card) => card.kind === undefined)) return;
+    api.cardInfo(cards.map((card) => card.id).filter(Boolean))
+      .then((infos) => setCards((current) => current !== cards ? current : current.map((card) => ({
+        ...card, kind: infos[card.id]?.kind ?? "", level: infos[card.id]?.level ?? 0,
+      }))))
+      .catch(() => { /* Sorting just puts them last */ });
+  }, [cards]);
 
   const load = useCallback(async (code: string, deckName?: string) => {
     setLoading(true);

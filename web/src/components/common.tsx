@@ -134,29 +134,58 @@ export interface SegmentOption<T> {
   tone?: string;
 }
 
-/** Pick one of a few options (MUI toggle buttons), with a pill that slides to the selected one. */
-export function Segmented<T extends string | number>({ value, options, onChange, pillId, label }: {
-  value: T;
+/** Pick one of a few options (MUI toggle buttons), with a pill that slides to the selected one.
+ *  The pill is one element behind all the buttons, moved to the selected button's measured box:
+ *  a pill inside each button (a shared layout animation) would pass over the earlier buttons'
+ *  labels while sliding, and clicking quickly could leave a label hidden under it. */
+export function Segmented<T extends string | number>({ value, options, onChange, label, small = false }: {
+  /** null: none selected */
+  value: T | null;
   options: SegmentOption<T>[];
   onChange: (value: T) => void;
-  /** Unique per control, so the pill slides within it */
-  pillId: string;
   label: string;
+  small?: boolean;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const root = box.current;
+    if (!root) return;
+    const measure = () => {
+      const selected = root.querySelector<HTMLElement>(".Mui-selected");
+      if (!selected) return setPill(null);
+      const outer = root.getBoundingClientRect();
+      const inner = selected.getBoundingClientRect();
+      // Not laid out (e.g. in a hidden deck tab): measured again once shown
+      if (!outer.width || !inner.width) return;
+      setPill({ x: inner.left - outer.left, y: inner.top - outer.top, width: inner.width, height: inner.height });
+    };
+    measure();
+    // Again when the labels change size (fonts loading, the window narrowing)
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [value]);
+  const tone = options.find((option) => option.value === value)?.tone;
+
+  // The pill comes before the group so it's drawn over the group's background but under every label
   return (
-    <ToggleButtonGroup exclusive value={value} aria-label={label}
-                       onChange={(_, next: T | null) => next !== null && onChange(next)}>
-      {options.map((option) => (
-        <ToggleButton key={option.value} value={option.value}
-                      className={option.tone ? `tone-${option.tone}` : ""}>
-          {value === option.value && (
-            <motion.span layoutId={pillId} className="segment-pill"
-                         transition={{ type: "spring", stiffness: 500, damping: 38 }} />
-          )}
-          <span className="segment-label">{option.label}</span>
-        </ToggleButton>
-      ))}
-    </ToggleButtonGroup>
+    <div className="segmented" ref={box}>
+      {pill && (
+        <motion.span className={`segment-pill ${tone ? `tone-${tone}` : ""}`} aria-hidden="true"
+                     initial={false} animate={pill}
+                     transition={{ duration: 0.22, ease: [0.25, 0.8, 0.3, 1] }} />
+      )}
+      <ToggleButtonGroup exclusive value={value} aria-label={label} size={small ? "small" : "medium"}
+                         onChange={(_, next: T | null) => next !== null && onChange(next)}>
+        {options.map((option) => (
+          <ToggleButton key={option.value} value={option.value}
+                        className={option.tone ? `tone-${option.tone}` : ""}>
+            <span className="segment-label">{option.label}</span>
+          </ToggleButton>
+        ))}
+      </ToggleButtonGroup>
+    </div>
   );
 }
 

@@ -34,6 +34,7 @@ class TestRateLimiter(unittest.TestCase):
 
     def test_kinds(self):
         self.assertEqual(request_kind("POST", "/api/decks"), "decks")
+        self.assertEqual(request_kind("POST", "/api/decks/info"), "decks")
         self.assertEqual(request_kind("GET", "/api/cards/123/image"), "images")
         self.assertEqual(request_kind("POST", "/api/stats"), "api")
         self.assertIsNone(request_kind("GET", "/assets/index.js"))

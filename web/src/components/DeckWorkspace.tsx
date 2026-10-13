@@ -2,15 +2,16 @@
 // mounted (hidden when not selected), so switching tabs keeps its hand, undo history and input.
 
 import Button from "@mui/material/Button";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { api, DrawResult, Stats } from "../api";
 import { exportStats } from "../export";
 import { DeckSetup } from "../useDeckSetup";
-import { SectionHeader, Spinner } from "./common";
+import { Overlay, SectionHeader, Spinner } from "./common";
 import { DeckLoader } from "./DeckPanel";
 import { ExportButton } from "./ExportButton";
-import { TagControls, TagGrid, useTagEditor } from "./DecklistView";
+import { SortControls, TagControls, TagGrid, useDeckOrder, useTagEditor } from "./DecklistView";
 import { HandView } from "./HandView";
+import { ShuffledDeckView } from "./ShuffledDeckView";
 import { StatsView } from "./StatsView";
 
 export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
@@ -27,6 +28,8 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   const [draw, setDraw] = useState<DrawResult | null>(null);
   const [drawId, setDrawId] = useState(0);
   const [drawing, setDrawing] = useState(false);
+  const [showingDeck, setShowingDeck] = useState(false);
+  const closeDeck = useCallback(() => setShowingDeck(false), []);
   const id = useId();
 
   // A new deck clears the old hand
@@ -74,8 +77,9 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   // Labelling on the page: the controls and the cards are in different panels
   const editor = useTagEditor({
     deckList: setup.deckList, tags: setup.tags, onChange: setup.applyTags,
-    shortcuts: active && shortcuts,
+    shortcuts: active && shortcuts && !showingDeck,
   });
+  const deckOrder = useDeckOrder(setup.cards, setup.deckList, setup.tags);
 
   return (
     <main className="layout" hidden={!active} aria-label={name}>
@@ -86,8 +90,8 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
 
       {/* Left: labelling controls above the test hand. Right: only the decklist, which fills
           the left column's height (h-0 + min-h-full) and scrolls inside it. The decklist gets
-          the wider column so its 10-card rows stay a readable size. */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          two thirds of the width so its 10-card rows stay a readable size. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="card-panel flex min-w-0 flex-col gap-5" aria-labelledby={`${id}-label`}>
           <div>
             <SectionHeader as="h2" id={`${id}-label`} title="Label your decklist" />
@@ -95,9 +99,14 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
           </div>
           <div className="flex flex-col border-t border-line pt-4">
             <SectionHeader as="h2" title="Test hand" action={
-              <Button variant="contained" className="min-w-[130px]" onClick={drawHand} disabled={!setup.cards || drawing}>
-                {drawing ? <Spinner /> : draw ? "Draw again" : "Draw hand"}
-              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outlined" onClick={() => setShowingDeck(true)} disabled={!draw}>
+                  Show shuffled deck
+                </Button>
+                <Button variant="contained" className="min-w-[130px]" onClick={drawHand} disabled={!setup.cards || drawing}>
+                  {drawing ? <Spinner /> : draw ? "Draw again" : "Draw hand"}
+                </Button>
+              </div>
             } />
             <HandView result={draw} drawId={drawId} idByName={setup.idByName} tagged={setup.labelled} />
           </div>
@@ -106,9 +115,10 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
         <section className="card-panel flex min-w-0 flex-col max-lg:max-h-[560px] lg:h-0 lg:min-h-full"
                  aria-labelledby={`${id}-list`}>
           <SectionHeader as="h2" id={`${id}-list`} title="Decklist"
-                         hint={setup.cards ? `· ${setup.size} cards` : undefined} />
+                         hint={setup.cards ? `· ${setup.size} cards` : undefined}
+                         action={setup.cards ? <SortControls deckOrder={deckOrder} /> : undefined} />
           {setup.cards ? (
-            <TagGrid editor={editor} idByName={setup.idByName} scroll />
+            <TagGrid editor={editor} idByName={setup.idByName} order={deckOrder.order} onMove={deckOrder.move} scroll />
           ) : (
             <p className="m-0 grid flex-1 place-items-center p-6 text-center text-muted">
               Load a deck, then click its cards to label them as engine, non-engine or brick.
@@ -116,6 +126,10 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
           )}
         </section>
       </div>
+
+      <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label="Shuffled deck" asWindow>
+        {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} onClose={closeDeck} />}
+      </Overlay>
 
       <section className="card-panel stats-panel min-h-[320px]" aria-labelledby={`${id}-stats`}>
         <SectionHeader as="h2" id={`${id}-stats`} title="Probabilities"
