@@ -25,6 +25,10 @@ def fake_names(card_ids, verbose=True):  # pylint: disable=unused-argument
     return {cid: f"Card {cid}" for cid in card_ids}
 
 
+def fake_infos(card_ids):
+    return {cid: {"kind": "spell_quick_play" if cid == "200" else "monster", "level": 4} for cid in card_ids}
+
+
 def setup_body(**extra):
     cards = [{"name": "Card 100", "copies": 3}, {"name": "Card 200", "copies": 2}]
     cards += [{"name": f"Card {300 + i}", "copies": 1} for i in range(35)]
@@ -60,13 +64,22 @@ class TestWebApi(unittest.TestCase):
         patcher = patch('ygo_calc.deck_loading.fetch_multiple_card_names', side_effect=fake_names)
         patcher.start()
         self.addCleanup(patcher.stop)
+        infos = patch('ygo_calc.web.server.fetch_card_infos', side_effect=fake_infos)
+        infos.start()
+        self.addCleanup(infos.stop)
 
     def test_load_deck(self):
         response = self.client.post("/api/decks", json={"code": YDK})
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["size"], 40)
-        self.assertEqual(data["cards"][0], {"name": "Card 100", "id": "100", "copies": 3})
+        self.assertEqual(data["cards"][0], {"name": "Card 100", "id": "100", "copies": 3, "kind": "monster", "level": 4})
+        self.assertEqual(data["cards"][1]["kind"], "spell_quick_play")
+
+    def test_card_infos(self):
+        response = self.client.post("/api/decks/info", json={"ids": ["200", "200", "x1"]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"200": {"kind": "spell_quick_play", "level": 4}})
 
     def test_load_bad_deck(self):
         response = self.client.post("/api/decks", json={"code": "#main\n#extra\n"})
@@ -94,6 +107,9 @@ class TestWebApi(unittest.TestCase):
         data = self.client.post("/api/draw", json={"deck": setup_body(tags=tags)}).json()
         self.assertEqual(len(data["hand"]), 5)
         self.assertIsNotNone(data["sixth"])
+        self.assertEqual(len(data["draws"]), 4)
+        self.assertEqual(len(data["deck"]), 40)
+        self.assertEqual(data["deck"][:5], data["hand"])
         self.assertIsNotNone(data["stats"]["sixth_card"])
 
     def test_tags_must_match_deck(self):

@@ -48,7 +48,7 @@ MAX_BODY_BYTES = 64 * 1024
 # Requests per client per minute, by kind. Generous for normal use: labelling cards sends a
 # (debounced) stats request per click, and opening a deck loads up to 60 card images.
 RATE_LIMITS = {
-    "decks": 30,     # POST /api/decks: looks card names up online
+    "decks": 30,     # POST /api/decks and /api/decks/info: look cards up online
     "images": 600,   # GET /api/cards/{id}/image: downloads images not yet cached
     "api": 300,      # everything else under /api
 }
@@ -93,7 +93,7 @@ def request_kind(method: str, path: str) -> Optional[str]:
         return None
     if path.startswith("/api/cards/"):
         return "images"
-    if path == "/api/decks" and method == "POST":
+    if path in ("/api/decks", "/api/decks/info") and method == "POST":
         return "decks"
     return "api"
 

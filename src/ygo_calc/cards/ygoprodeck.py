@@ -9,13 +9,27 @@ from .edopro import fetch_edopro_card_names
 from .http import fetch_json
 
 CARDINFO_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids}"
+# A spell or trap card's "race" -> its subtype
+SUBTYPES = {"Normal": "normal", "Quick-Play": "quick_play", "Continuous": "continuous", "Field": "field",
+            "Equip": "equip", "Ritual": "ritual", "Counter": "counter"}
+
+
+def card_info(card: dict) -> dict:
+    """A YGOPRODeck card entry's kind (monster, spell_<subtype>, trap_<subtype>) and level."""
+    frame = card.get('frameType', '')
+    if frame in ('spell', 'trap'):
+        return {"kind": f"{frame}_{SUBTYPES.get(card.get('race', ''), 'normal')}", "level": 0}
+    if 'Monster' in card.get('type', ''):
+        return {"kind": "monster", "level": int(card.get('level') or 0)}
+    return {"kind": "", "level": 0}
 
 
 def _remember_card(card: dict) -> str:
-    """Cache a YGOPRODeck card entry's name and small image; returns the name."""
+    """Cache a YGOPRODeck card entry's name, kind and small image; returns the name."""
     card_id = str(card['id'])
     card_name = html.unescape(card['name'])
     cache.names[card_id] = card_name
+    cache.info[card_id] = card_info(card)
     if 'card_images' in card and len(card['card_images']) > 0:
         cache.image_urls[card_id] = card['card_images'][0].get('image_url_small', '')
     return card_name
@@ -29,12 +43,7 @@ def fetch_card_name(card_id: str) -> str:
     try:
         data = fetch_json(CARDINFO_URL.format(ids=card_id), timeout=10)
         if 'data' in data and len(data['data']) > 0:
-            card_data = data['data'][0]
-            card_name = html.unescape(card_data['name'])
-            cache.names[card_id] = card_name
-            if 'card_images' in card_data and len(card_data['card_images']) > 0:
-                cache.image_urls[card_id] = card_data['card_images'][0].get('image_url_small', '')
-            return card_name
+            return _remember_card(data['data'][0])
     except Exception:
         logging.exception("Failed to fetch card name for id %s", card_id)
 
@@ -87,7 +96,29 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
             for cid, real_id in aliased.items():
                 if real_id in real:
                     result[cid] = cache.names[cid] = real[real_id]
+                if real_id in cache.info:
+                    cache.info[cid] = cache.info[real_id]
                 if cache.image_urls.get(real_id):
                     cache.image_urls[cid] = cache.image_urls[real_id]
 
     return result
+
+
+def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
+    """Each card's kind and level (see card_info), looking up the ones not cached yet.
+
+    Unknown cards get kind "".
+    """
+    missing = [cid for cid in card_ids if cid not in cache.info and cid.isdigit()]
+    if missing:
+        try:
+            data = fetch_json(CARDINFO_URL.format(ids=",".join(missing)), timeout=20)
+            for card in data.get('data', []):
+                _remember_card(card)
+        except Exception:
+            logging.exception("Failed to fetch card info from API")
+        # EDOPro for anything YGOPRODeck didn't return (it caches the kind as it goes)
+        still_missing = [cid for cid in missing if cid not in cache.info]
+        if still_missing:
+            fetch_edopro_card_names(still_missing)
+    return {cid: cache.info.get(cid, {"kind": "", "level": 0}) for cid in card_ids}

@@ -285,7 +285,7 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
       )}
 
       <div className="compare-actions">
-        <Segmented value={handSize} onChange={changeHandSize} pillId="hand-pill" label="Hand size"
+        <Segmented value={handSize} onChange={changeHandSize} label="Hand size"
                    options={HAND_SIZES.map(({ size, label }) => ({ value: size, label }))} />
         <Button variant="contained" size="large" onClick={() => compare()} disabled={busy || !chosen} className="compare-button">
           {busy ? <Spinner /> : "Calculate & Compare"}

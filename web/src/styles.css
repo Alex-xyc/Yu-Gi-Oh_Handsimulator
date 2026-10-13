@@ -70,7 +70,7 @@
 .deck-tab-add { width: 36px; height: 36px; margin-bottom: 2px; border-radius: 8px; font-size: 20px; }
 .deck-tab-add:hover:not(:disabled) { background: var(--color-surface-2); color: var(--color-text); }
 .deck-tab-add:disabled { opacity: 0.35; cursor: default; }
-:is(.deck-tab-select, .deck-tab-close, .deck-tab-add, .tag-tile):focus-visible {
+:is(.deck-tab-select, .deck-tab-close, .deck-tab-add, .tag-tile, .reveal-card):focus-visible {
   outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
 /* Deck loading */
@@ -142,26 +142,65 @@ table { border-collapse: collapse; width: 100%; }
 .overlay-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(5, 6, 10, 0.88); display: flex; padding: 16px; }
 .overlay-panel { flex: 1; overflow: auto; scrollbar-gutter: stable; background: var(--color-surface);
                  border: 1px solid var(--color-line-strong); border-radius: 18px; box-shadow: var(--shadow-overlay);
-                 padding: 18px 22px; outline: none; }
+                 padding: 18px 22px; outline: none; overscroll-behavior: contain; }
+/* The scrollbar starts and ends inside the rounded corners */
+.overlay-panel::-webkit-scrollbar-track { margin-block: 14px; }
 /* A window over the page: centred, smaller, with the page still visible around it */
 .overlay-backdrop.window { align-items: center; justify-content: center; padding: 40px 32px; background: rgba(5, 6, 10, 0.6); }
 .overlay-backdrop.window .overlay-panel { flex: 0 1 1180px; max-height: min(86vh, 980px); }
 .overlay-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .overlay-header h2 { font-size: 18px; margin-bottom: 8px; }
+/* A header that stays at the top while the window scrolls: it spans the panel's padding so the
+   content scrolls out of sight under it */
+.overlay-header.pinned { position: sticky; top: -18px; z-index: 3; margin: -18px -22px 0; padding: 18px 22px 10px;
+                         background: var(--color-surface); border-bottom: 1px solid var(--color-line); }
 .toasts { position: fixed; right: 20px; bottom: 20px; left: 20px; z-index: 90; display: flex; flex-direction: column;
           align-items: flex-end; gap: 8px; pointer-events: none; }
 .toasts .MuiAlert-root { max-width: 380px; pointer-events: auto; }
 
 /* Segmented control (MUI toggle buttons) with a sliding pill */
-.segment-pill { position: absolute; inset: 0; border-radius: 9px; background: var(--tone, var(--color-accent-strong));
-                box-shadow: 0 4px 16px color-mix(in srgb, var(--tone, var(--color-accent)) 45%, transparent); }
+/* Clipped to the control's rounded box, so the pill never shows outside it, even mid-slide */
+.segmented { position: relative; display: inline-flex; overflow: hidden; border-radius: 12px; }
+/* One pill per control, placed on the selected button by the Segmented component */
+.segment-pill { position: absolute; left: 0; top: 0; border-radius: 9px; background: var(--tone, var(--color-accent-strong));
+                box-shadow: 0 4px 16px color-mix(in srgb, var(--tone, var(--color-accent)) 45%, transparent);
+                transition: background-color 0.2s, box-shadow 0.2s; pointer-events: none; }
+/* The keyboard focus ring goes inside the buttons, or the clipping would cut it off */
+.segmented .MuiToggleButton-root.Mui-focusVisible { outline-offset: -2px; }
+/* Smaller buttons in a panel header */
+.segmented .MuiToggleButton-sizeSmall { padding: 3px 11px; font-size: 13px; }
 /* Dark text on the bright label colours, white on the purple (both WCAG AA) */
 .MuiToggleButton-root[class*="tone-"].Mui-selected { color: var(--color-ink); }
 .segment-label { position: relative; font-weight: 600; }
 
 /* Labelling cards */
-.tag-tile { position: relative; padding: 0; border: 2px solid transparent; border-radius: 9px; background: none; cursor: pointer;
-            transition: border-color 0.2s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth); }
+.tag-tile { position: relative; display: block; padding: 0; border: 2px solid transparent; border-radius: 9px; background: none; cursor: pointer;
+            transition: border-color 0.2s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth), transform 0.2s var(--ease-smooth),
+                        opacity 0.2s; }
+.tag-tile:hover { transform: translateY(-3px); }
+.tag-tile:active { transform: scale(0.96); }
+/* Picked cards (shift-click): a blue frame and tick, over their label colour, which still shows */
+.tag-tile.selected, .tag-tile.tagged.selected { outline: 3px solid var(--color-sixth); outline-offset: 2px;
+                                                box-shadow: 0 0 18px color-mix(in srgb, var(--color-sixth) 55%, transparent); }
+.tile-check { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 18px; height: 18px;
+              border-radius: 999px; background: var(--color-sixth); color: var(--color-ink); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+/* The art fades like a card being dragged; the frame, tick and label stay clear */
+.tag-tile .card-image { transition: opacity 0.2s; }
+.tag-tile.selected .card-image { opacity: 0.45; }
+.selection-count { font-weight: 700; color: var(--color-sixth); }
+/* Dragging: the cards being moved fade, and a blue bar shows where they'll go */
+.tag-tile.dragging { opacity: 0.35; }
+.tag-tile:is(.drop-before, .drop-after)::after { content: ""; position: absolute; top: 3px; bottom: 3px; width: 4px; border-radius: 2px;
+                                                  background: var(--color-sixth); pointer-events: none;
+                                                  box-shadow: 0 0 10px var(--color-sixth); }
+.tag-tile.drop-before::after { left: -7px; }
+.tag-tile.drop-after::after { right: -7px; }
+/* What's under the pointer while dragging: a blank card outline, with how many cards when several */
+.drag-ghost { position: fixed; top: -1000px; left: -1000px; pointer-events: none; border: 2px dashed var(--color-sixth);
+              border-radius: 9px; background: color-mix(in srgb, var(--color-sixth) 18%, var(--color-surface)); }
+.drag-count { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; min-width: 24px; height: 24px;
+              padding: 0 6px; border-radius: 999px; background: var(--color-sixth); color: var(--color-ink);
+              font-size: 13px; font-weight: 800; }
 .tag-tile .card-image { border-radius: 7px; }
 .tile-tint { position: absolute; inset: 0; border-radius: 7px; background: var(--tone, transparent); opacity: 0;
              mix-blend-mode: color; transition: opacity 0.25s var(--ease-smooth); pointer-events: none; }
@@ -231,6 +270,7 @@ table { border-collapse: collapse; width: 100%; }
   .overlay-backdrop.window { padding: 16px; }
   .overlay-backdrop.window .overlay-panel { max-height: 100%; }
   .overlay-panel { padding: 16px; }
+  .overlay-header.pinned { top: -16px; margin: -16px -16px 0; padding: 16px 16px 10px; }
 }
 /* Phones (after the rules it overrides) */
 @media (max-width: 600px) {

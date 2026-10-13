@@ -20,6 +20,22 @@ SAFE_CDB_NAME = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]{0,99}\.cdb")
 MAX_CDB_BYTES = 200 * 1024 * 1024
 EDOPRO_CACHE_MAX_AGE = 7 * 24 * 60 * 60  # Re-download CDBs weekly
 EDOPRO_TYPE_TOKEN = 0x4000
+EDOPRO_TYPE_MONSTER, EDOPRO_TYPE_SPELL, EDOPRO_TYPE_TRAP = 0x1, 0x2, 0x4
+# Spell / trap subtype bits
+EDOPRO_SUBTYPES = ((0x10000, "quick_play"), (0x20000, "continuous"), (0x40000, "equip"),
+                   (0x80000, "field"), (0x80, "ritual"), (0x100000, "counter"))
+
+
+def _edopro_info(card_type: int, level: int) -> dict:
+    """A card's kind (monster, spell_<subtype>, trap_<subtype>) and level from its EDOPro type bits."""
+    if card_type & (EDOPRO_TYPE_SPELL | EDOPRO_TYPE_TRAP):
+        base = "spell" if card_type & EDOPRO_TYPE_SPELL else "trap"
+        subtype = next((name for bit, name in EDOPRO_SUBTYPES if card_type & bit), "normal")
+        return {"kind": f"{base}_{subtype}", "level": 0}
+    if card_type & EDOPRO_TYPE_MONSTER:
+        # The low byte is the level; the rest holds the pendulum scales
+        return {"kind": "monster", "level": level & 0xff}
+    return {"kind": "", "level": 0}
 
 
 def _edopro_cache_dir() -> str:
@@ -96,23 +112,26 @@ def fetch_edopro_card_names(card_ids: List[str]) -> Dict[str, str]:
             try:
                 placeholders = ",".join("?" * len(missing))
                 rows = conn.execute(
-                    "SELECT t.id, t.name, d.type FROM texts t JOIN datas d ON d.id = t.id "
+                    "SELECT t.id, t.name, d.type, d.level FROM texts t JOIN datas d ON d.id = t.id "
                     f"WHERE t.id IN ({placeholders})",
                     [int(cid) for cid in missing]
                 ).fetchall()
-                rows = [(cid, cname, _edopro_token_creator(conn, cid, cname) if ctype & EDOPRO_TYPE_TOKEN else None)
-                        for cid, cname, ctype in rows]
+                rows = [(cid, cname, _edopro_token_creator(conn, cid, cname) if ctype & EDOPRO_TYPE_TOKEN else None,
+                         _edopro_info(ctype, clevel))
+                        for cid, cname, ctype, clevel in rows]
             finally:
                 conn.close()
         except Exception:
             logging.exception("Failed to read EDOPro database %s", name)
             continue
-        for card_id, card_name, creator in rows:
+        for card_id, card_name, creator, info in rows:
             card_id = str(card_id)
             if creator:
                 # Tokens can't be in a deck, so a token ID means the card that makes it
                 creator_id, card_name = creator
                 cache.aliases[card_id] = creator_id
+            else:
+                cache.info.setdefault(card_id, info)
             result[card_id] = card_name
             cache.names[card_id] = card_name
             cache.image_urls.setdefault(

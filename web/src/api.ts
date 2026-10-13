@@ -14,6 +14,11 @@ export interface DeckCard {
   name: string;
   id: string;
   copies: number;
+  /** "monster", "spell_<subtype>" or "trap_<subtype>" ("" or missing if unknown, e.g. saved
+   *  before it was sent); for sorting the decklist */
+  kind?: string;
+  /** A monster's level */
+  level?: number;
 }
 
 export interface Counts {
@@ -63,6 +68,10 @@ export interface DrawnCard {
 export interface DrawResult {
   hand: DrawnCard[];
   sixth: DrawnCard | null;
+  /** The next cards after the 6th, for extra draws */
+  draws: DrawnCard[];
+  /** The whole deck in shuffled order (the hand first) */
+  deck: DrawnCard[];
   stats: Stats;
 }
 
@@ -118,6 +127,8 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 
 export const api = {
   loadDeck: (code: string) => post<{ cards: DeckCard[]; size: number }>("/api/decks", { code }),
+  /** Each card's kind and level by ID, for decks saved before the card list had them */
+  cardInfo: (ids: string[]) => post<Record<string, { kind: string; level: number }>>("/api/decks/info", { ids }),
   /** handSize 6 gives the odds going second */
   stats: (deck: DeckSetupBody, signal?: AbortSignal, handSize = 5) =>
     post<Stats>(`/api/stats?hand_size=${handSize}`, deck, signal),
