@@ -2,7 +2,7 @@
 // only loaded when an export is clicked.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { CATEGORIES, CATEGORY_LABELS, combinationOdds, Comparison, DrawResult, OddsPair, Stats } from "./api";
+import { CATEGORIES, CATEGORY_LABELS, combinationOdds, Comparison, DrawResult, OddsPair, percentDigits, Stats } from "./api";
 
 type Cell = string | number | null;
 /** How a column's numbers are shown */
@@ -33,7 +33,11 @@ function addTable(sheet: Worksheet, startRow: number, title: string, headers: st
       const cell = row.getCell(i + 1);
       cell.value = value;
       const fmt = NUM_FMT[formats[i] ?? "text"];
-      if (fmt && typeof value === "number") cell.numFmt = fmt;
+      if (fmt && typeof value === "number") {
+        // A tiny chance gets enough decimals not to show as 0.0%
+        const places = formats[i] === "percent" ? percentDigits(Math.abs(value)) : 1;
+        cell.numFmt = places > 1 ? `0.${"0".repeat(places)}%` : fmt;
+      }
     });
   });
   return startRow + rows.length + 3;

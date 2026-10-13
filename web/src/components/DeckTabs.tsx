@@ -41,7 +41,9 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
   return (
     <nav className="deck-tabs" aria-label="Decks" ref={nav}>
       <ul className="deck-tab-list">
-        <AnimatePresence initial={false}>
+        {/* popLayout: a closing tab leaves the row at once (it fades out on top of it), so the
+            tabs after it slide left straight away instead of waiting, and sometimes staying put */}
+        <AnimatePresence initial={false} mode="popLayout">
           {tabs.map((tab) => {
             const current = tab.slot === active;
             return (

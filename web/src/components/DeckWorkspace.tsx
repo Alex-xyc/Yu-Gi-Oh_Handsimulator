@@ -127,7 +127,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
         </section>
       </div>
 
-      <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label="Shuffled deck" asWindow>
+      <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label="Shuffled deck" asWindow fit>
         {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} onClose={closeDeck} />}
       </Overlay>
 
