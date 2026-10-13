@@ -1,5 +1,10 @@
-"""Hypergeometric probability maths for opening hands."""
+"""Hypergeometric probability maths for opening hands.
 
+Everything is counted exactly in whole numbers of hands (Fractions) and only turned into a
+float at the end, so results are as accurate as a float can hold, even for tiny chances.
+"""
+
+from fractions import Fraction
 from itertools import product
 from math import comb
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -7,26 +12,39 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from .deck import YuGiOhDeck
 
 
+def _hands_with(population: int, successes_in_pop: int, draws: int, target_successes: int) -> int:
+    """Number of hands with exactly target_successes of the successes_in_pop cards."""
+    if target_successes < 0 or target_successes > successes_in_pop or target_successes > draws:
+        return 0
+    if draws - target_successes > population - successes_in_pop:
+        return 0
+    return comb(successes_in_pop, target_successes) * comb(population - successes_in_pop, draws - target_successes)
+
+
+def exact_probability_at_least(population: int, successes_in_pop: int,
+                               draws: int, min_successes: int) -> Fraction:
+    """Exact chance of at least min_successes (as a Fraction)."""
+    total = comb(population, draws) if 0 <= draws <= population else 0
+    if total == 0:
+        return Fraction(0)
+    ways = sum(_hands_with(population, successes_in_pop, draws, k)
+               for k in range(max(min_successes, 0), min(successes_in_pop, draws) + 1))
+    return Fraction(ways, total)
+
+
 def hypergeometric_probability(population: int, successes_in_pop: int,
                                 draws: int, target_successes: int) -> float:
     """Calculate hypergeometric probability."""
-    if target_successes > successes_in_pop or target_successes > draws:
+    total = comb(population, draws) if 0 <= draws <= population else 0
+    if total == 0:
         return 0.0
-    if target_successes < 0 or (draws - target_successes) > (population - successes_in_pop):
-        return 0.0
-
-    numerator = comb(successes_in_pop, target_successes) * comb(population - successes_in_pop, draws - target_successes)
-    denominator = comb(population, draws)
-    return numerator / denominator if denominator > 0 else 0.0
+    return float(Fraction(_hands_with(population, successes_in_pop, draws, target_successes), total))
 
 
 def probability_at_least(population: int, successes_in_pop: int,
                          draws: int, min_successes: int) -> float:
     """Calculate probability of at least N successes."""
-    prob = 0.0
-    for k in range(min_successes, min(successes_in_pop, draws) + 1):
-        prob += hypergeometric_probability(population, successes_in_pop, draws, k)
-    return prob
+    return float(exact_probability_at_least(population, successes_in_pop, draws, min_successes))
 
 
 def engine_non_engine_probability(deck_size: int, engine_count: int, non_engine_count: int,
@@ -40,9 +58,9 @@ def engine_non_engine_probability(deck_size: int, engine_count: int, non_engine_
         other_count = deck_size - engine_count - non_engine_count
         other_in_hand = hand_size - engine_drawn - non_engine_drawn
         if 0 <= other_in_hand <= other_count:
-            return (comb(engine_count, engine_drawn) *
-                    comb(non_engine_count, non_engine_drawn) *
-                    comb(other_count, other_in_hand)) / comb(deck_size, hand_size)
+            return float(Fraction(comb(engine_count, engine_drawn) *
+                                  comb(non_engine_count, non_engine_drawn) *
+                                  comb(other_count, other_in_hand), comb(deck_size, hand_size)))
     return None
 
 
@@ -65,7 +83,7 @@ def category_probability(deck_size: int, counts: Sequence[int], hand_size: int,
             for n, k in zip(counts, drawn):
                 combos *= comb(n, k)
             ways += combos
-    return ways / total
+    return float(Fraction(ways, total))
 
 
 def calculate_probabilities(deck: YuGiOhDeck, hand_size: int = 5) -> Dict:

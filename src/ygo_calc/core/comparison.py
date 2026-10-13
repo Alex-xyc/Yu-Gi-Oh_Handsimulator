@@ -153,7 +153,7 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
         composition.append({"label": "Untagged", "a": untagged_1, "b": untagged_2})
 
     def better(diff: float, higher_is_better: bool) -> Optional[int]:
-        if abs(diff) < 0.0005:
+        if abs(diff) < 1e-12:  # Equal (up to float noise)
             return None
         return 2 if (diff > 0) == higher_is_better else 1
 

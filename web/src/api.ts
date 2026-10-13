@@ -141,6 +141,21 @@ export function cardImageUrl(id: string | undefined, size: "small" | "full" = "s
   return id && /^\d+$/.test(id) ? `/api/cards/${id}/image?size=${size}` : null;
 }
 
-export function percent(p: number, digits = 1): string {
-  return `${(p * 100).toFixed(digits)}%`;
+/** Decimals to show value with: digits, or more for a small non-zero value so it doesn't round to 0
+ * (two significant figures, e.g. 0.022) */
+export function decimalsFor(value: number, digits = 1): number {
+  const size = Math.abs(value);
+  if (size <= 1e-10 || size >= 0.5 * 10 ** -digits) return digits;
+  // Round to two significant figures first, so 0.00999 gives 0.010 and not 0.0100
+  return Math.min(1 - Math.floor(Math.log10(Number(size.toPrecision(2)))), 12);
 }
+
+/** Decimals for a 0..1 chance shown as a percentage */
+export const percentDigits = (p: number, digits = 1) => decimalsFor(p * 100, digits);
+
+export function percent(p: number, digits = 1, decimals = percentDigits(p, digits)): string {
+  return `${(p * 100).toFixed(decimals)}%`;
+}
+
+/** The most characters any of these chances takes as a percentage (to size their column) */
+export const percentWidth = (values: number[]) => Math.max(0, ...values.map((p) => percent(p).length));

@@ -7,7 +7,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cardImageUrl } from "../api";
+import { cardImageUrl, percent, percentDigits } from "../api";
 
 /** A card picture, or its name on a plain tile when there's no image. */
 export function CardImage({ id, name, size = "small", className = "" }: {
@@ -50,9 +50,12 @@ const CONTENT: Variants = {
  *  With `keepMounted` its contents are built once and kept (hidden) while closed, so opening and
  *  closing only run the animation; building a large view at that moment stalls the fade.
  *  With `asWindow` it's a smaller centred window over the dimmed page instead, closed by clicking
- *  outside it. Focus moves into it while open; the page behind should be made inert meanwhile. */
-export function Overlay({ open, onClose, children, label, keepMounted = false, asWindow = false }: {
+ *  outside it. With `fit` the window takes its full height and doesn't scroll: the contents fill
+ *  it and size themselves to it. Focus moves into it while open; the page behind should be made
+ *  inert meanwhile. */
+export function Overlay({ open, onClose, children, label, keepMounted = false, asWindow = false, fit = false }: {
   open: boolean; onClose: () => void; children: ReactNode; label: string; keepMounted?: boolean; asWindow?: boolean;
+  fit?: boolean;
 }) {
   // Rendered from the first open (or from the start with keepMounted) and then kept
   const [mounted, setMounted] = useState(open || keepMounted);
@@ -98,7 +101,7 @@ export function Overlay({ open, onClose, children, label, keepMounted = false, a
                 onMouseDown={asWindow ? (e) => { if (e.target === e.currentTarget) onClose(); } : undefined}
                 variants={BACKDROP} initial="closed" animate={open ? "open" : "closed"}
                 onAnimationComplete={(state) => { if (state === "closed") setHidden(true); }}>
-      <motion.div className="overlay-panel" variants={PANEL} ref={panel} tabIndex={-1}>
+      <motion.div className={`overlay-panel ${fit ? "fit" : ""}`} variants={PANEL} ref={panel} tabIndex={-1}>
         <motion.div variants={CONTENT}>{children}</motion.div>
       </motion.div>
     </motion.div>
@@ -210,7 +213,8 @@ export function AnimatedPercent({ value, digits = 1 }: { value: number; digits?:
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [value]);
-  return <>{(shown * 100).toFixed(digits)}%</>;
+  // Decimals from the target, so the width doesn't jump while counting
+  return <>{percent(shown, digits, percentDigits(value, digits))}</>;
 }
 
 /** A horizontal bar whose width animates to the value (0..1). */

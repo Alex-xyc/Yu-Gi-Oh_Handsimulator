@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { memo } from "react";
-import { CardOdds, CATEGORIES, CATEGORY_LABELS, percent, Stats } from "../api";
+import { CardOdds, CATEGORIES, CATEGORY_LABELS, percent, percentWidth, Stats } from "../api";
 import { AnimatedPercent, Bar, Dot, SectionHeader, StatTile } from "./common";
 
 const GROUPS: { key: CardOdds["group"]; title: string }[] = [
@@ -55,6 +55,8 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
     );
   }
   const maxCell = Math.max(...stats.matrix.flat().map((p) => p ?? 0), 0.0001);
+  // The value column fits the longest number, so every row's bar lines up
+  const valueWidth = percentWidth(CATEGORIES.flatMap((key) => stats.at_least[key]));
   const grouped = tagged;
 
   return (
@@ -66,7 +68,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
       </div>
 
       <Section title="Opening hand" hint="(chance of drawing X or more)">
-        <div className="odds-groups">
+        <div className="odds-groups" style={{ ["--value-ch" as string]: valueWidth }}>
           {CATEGORIES.map((key) => (
             <div key={key} className="odds-rows">
               {stats.at_least[key].map((p, i) => (
@@ -97,7 +99,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand }: { s
                   {row.map((p, ne) => (
                     <td key={ne} className="mono"
                         style={{ ["--heat" as string]: p ? String(0.08 + 0.72 * (p / maxCell)) : "0" }}>
-                      {p && p >= 0.0005 ? percent(p) : "–"}
+                      {p && p > 1e-12 ? percent(p) : "–"}
                     </td>
                   ))}
                 </tr>

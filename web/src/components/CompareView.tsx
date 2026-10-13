@@ -5,8 +5,8 @@ import Chip from "@mui/material/Chip";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { motion } from "framer-motion";
-import { memo, ReactNode, useId, useState } from "react";
-import { api, combinationOdds, Comparison, DeckSetupBody, OddsPair, percent } from "../api";
+import { CSSProperties, memo, ReactNode, useId, useState } from "react";
+import { api, combinationOdds, Comparison, decimalsFor, DeckSetupBody, OddsPair, percent, percentWidth } from "../api";
 import { exportComparison } from "../export";
 import { DeckSetup } from "../useDeckSetup";
 import { Bar, deckTone, Dot, SectionHeader, Segmented, Spinner, TruncatedName } from "./common";
@@ -40,15 +40,28 @@ function deckNames(decks: [CompareDeck, CompareDeck]): [string, string] {
 
 /** Deck 2 minus deck 1; green when that favours deck 2, red when it favours deck 1. */
 function Diff({ value, digits = 1, better = null }: { value: number; digits?: number; better?: 1 | 2 | null }) {
-  if (Math.abs(value) < 0.5 * 10 ** -digits) return <span className="diff zero" aria-label="No difference">–</span>;
+  if (Math.abs(value) <= 1e-10) return <span className="diff zero" aria-label="No difference">–</span>;
   const tone = better === 2 ? "good" : better === 1 ? "bad" : "";
-  return <span className={`diff ${tone}`}>{value > 0 ? "+" : ""}{value.toFixed(digits)}</span>;
+  return <span className={`diff ${tone}`}>{diffText(value, digits)}</span>;
 }
+
+const diffText = (value: number, digits = 1) =>
+  Math.abs(value) <= 1e-10 ? "–" : `${value > 0 ? "+" : ""}${value.toFixed(decimalsFor(value, digits))}`;
 
 /** Which deck a difference favours, given whether more is better */
 function favours(diff: number, moreIsBetter: boolean | null | undefined): 1 | 2 | null {
   if (moreIsBetter == null || diff === 0) return null;
   return (diff > 0) === moreIsBetter ? 2 : 1;
+}
+
+/** Widths (in characters) for the odds rows' number columns, from their longest value, so
+ * every row's bars line up however many decimals a tiny chance needs */
+function columnWidths(result: Comparison): CSSProperties {
+  const rows = [...result.odds, ...result.at_least.flatMap((group) => group.rows), ...result.bricks];
+  return {
+    ["--value-ch" as string]: percentWidth(rows.flatMap((row) => [row.a, row.b])),
+    ["--diff-ch" as string]: Math.max(0, ...rows.map((row) => diffText((row.b - row.a) * 100).length)),
+  };
 }
 
 /** Probabilities for both decks as paired bars, with the difference and the better deck */
@@ -134,7 +147,7 @@ function Results({ result, onExport, onError }: {
   const turn = result.hand_size === 5 ? "going first" : "going second";
   return (
     <motion.div className="compare-results" key={JSON.stringify(result.names) + result.hand_size}
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={columnWidths(result)}>
       <div className="compare-legend">
         {result.names.map((name, side) => (
           <Chip key={side} color={side ? "deckB" : "deckA"} icon={<Dot tone={deckTone(side)} />}

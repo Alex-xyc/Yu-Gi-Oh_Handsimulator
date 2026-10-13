@@ -47,7 +47,7 @@
    smallest tabs don't fit (phones), the row scrolls sideways. */
 .deck-tabs { position: relative; display: flex; align-items: flex-end; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--color-line);
              overflow-x: auto; scrollbar-width: none; }
-.deck-tab-list { display: flex; align-items: flex-end; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.deck-tab-list { position: relative; display: flex; align-items: flex-end; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .deck-tab { position: relative; display: flex; align-items: center; flex: 0 1 auto; min-width: 150px; max-width: 240px;
             border: 1px solid var(--color-line); border-bottom: none; border-radius: var(--radius-control) var(--radius-control) 0 0;
             background: var(--color-surface-2); color: var(--color-muted); transition: background 0.2s, color 0.2s; }
@@ -115,17 +115,18 @@
 .odds-groups { display: flex; flex-direction: column; }
 .odds-groups .odds-rows { padding: 12px 0; border-top: 1px solid var(--color-line); }
 .odds-groups .odds-rows:first-child { border-top: none; padding-top: 0; }
-.odds-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) 58px; align-items: center; gap: 12px; }
-.odds-row .value { text-align: right; }
+.odds-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto; align-items: center; gap: 12px; }
+/* As wide as the longest value in the section (--value-ch characters), so the bars line up */
+.odds-row .value { text-align: right; white-space: nowrap; min-width: max(58px, calc(var(--value-ch, 5) * 1ch)); }
 .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 65%, transparent), var(--tone));
             box-shadow: 0 0 12px color-mix(in srgb, var(--tone) 50%, transparent); }
 .matrix-wrap { overflow-x: auto; }
-.matrix { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 300px; table-layout: fixed; }
+.matrix { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 300px; }
 .matrix th:first-child { width: 44px; }
 .matrix abbr { text-decoration: none; }
-.matrix th { font-size: 11px; font-weight: 500; color: var(--color-muted); padding: 2px 4px; }
-.matrix td { text-align: center; padding: 6px 4px; border-radius: 6px; color: var(--color-text);
+.matrix th { white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--color-muted); padding: 2px 4px; }
+.matrix td { text-align: center; padding: 6px 4px; white-space: nowrap; border-radius: 6px; color: var(--color-text);
              background: rgba(124, 92, 255, var(--heat)); transition: background 0.4s var(--ease-smooth); }
 
 /* Data tables (card odds, comparison) */
@@ -148,6 +149,9 @@ table { border-collapse: collapse; width: 100%; }
 /* A window over the page: centred, smaller, with the page still visible around it */
 .overlay-backdrop.window { align-items: center; justify-content: center; padding: 40px 32px; background: rgba(5, 6, 10, 0.6); }
 .overlay-backdrop.window .overlay-panel { flex: 0 1 1180px; max-height: min(86vh, 980px); }
+/* A window whose contents fit it without scrolling: always its full height, for them to fill */
+.overlay-backdrop.window .overlay-panel.fit { height: min(86vh, 980px); overflow: hidden; }
+.overlay-panel.fit > div { height: 100%; }
 .overlay-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .overlay-header h2 { font-size: 18px; margin-bottom: 8px; }
 /* A header that stays at the top while the window scrolls: it spans the panel's padding so the
@@ -242,17 +246,18 @@ table { border-collapse: collapse; width: 100%; }
 .compare-table tr.changed td { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
 /* Each statistic gets its own band, divided by a line */
 .compare-odds { display: flex; flex-direction: column; }
-.compare-odds-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(160px, 2fr) 64px minmax(90px, 140px);
+.compare-odds-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(160px, 2fr) auto minmax(90px, 140px);
                     align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
 .compare-odds-row:first-child { border-top: 1px solid var(--color-line); }
 /* "X or more": one block per category, each with its own title */
 .compare-groups { display: flex; flex-direction: column; gap: 18px; }
 .compare-group-title { display: flex; align-items: center; margin: 0 0 8px; font-size: 12.5px; font-weight: 600; }
 .dual-bars { display: flex; flex-direction: column; gap: 9px; }
-.dual { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 10px; opacity: 0.75; transition: opacity 0.2s; }
+.dual { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; opacity: 0.75; transition: opacity 0.2s; }
 .dual.better { opacity: 1; }
-.dual .mono { text-align: right; font-size: 12px; }
-.diff { font-family: var(--font-mono); font-size: 12.5px; text-align: right; display: block; }
+.dual .mono { text-align: right; font-size: 12px; white-space: nowrap; min-width: max(52px, calc(var(--value-ch, 5) * 1ch)); }
+.diff { font-family: var(--font-mono); font-size: 12.5px; text-align: right; display: block; white-space: nowrap; }
+.compare-odds-row .diff { min-width: max(64px, calc(var(--diff-ch, 5) * 1ch)); }
 .diff.good { color: var(--color-ok); }
 .diff.bad { color: var(--color-danger); }
 .diff.zero { color: var(--color-muted); }
@@ -261,14 +266,15 @@ table { border-collapse: collapse; width: 100%; }
 
 /* Tablets and phones */
 @media (max-width: 700px) {
-  .compare-odds-row { grid-template-columns: 1fr 64px; }
+  .compare-odds-row { grid-template-columns: 1fr auto; }
   .compare-odds-row .dual-bars { grid-column: 1 / -1; grid-row: 2; }
   .better-tag { display: none; }
   .compare-table td:not(:first-child), .compare-table th:not(:first-child) { width: 74px; }
-  .odds-row { grid-template-columns: 1fr 58px; }
+  .odds-row { grid-template-columns: 1fr auto; }
   .odds-row .bar { grid-column: 1 / -1; grid-row: 2; }
   .overlay-backdrop.window { padding: 16px; }
   .overlay-backdrop.window .overlay-panel { max-height: 100%; }
+  .overlay-backdrop.window .overlay-panel.fit { height: 100%; }
   .overlay-panel { padding: 16px; }
   .overlay-header.pinned { top: -16px; margin: -16px -16px 0; padding: 16px 16px 10px; }
 }

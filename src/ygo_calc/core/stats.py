@@ -1,10 +1,11 @@
 """Opening-hand statistics as plain data (for the web app; report.py formats the same as text)."""
 
+from fractions import Fraction
 from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
 from .categories import BRICK, CATEGORIES, ENGINE, NON_ENGINE, CardPool, count_categories
 from .probability import (category_probability, engine_non_engine_probability,
-                          hypergeometric_probability, probability_at_least)
+                          exact_probability_at_least, probability_at_least)
 
 # Draw counts are passed to each check as (engine, non-engine, brick)
 Drawn = Tuple[int, int, int]
@@ -62,13 +63,13 @@ def opening_stats(pool: CardPool, hand_categories: Optional[List[str]] = None,
                 for key in CATEGORIES}
 
     remaining = deck_size - hand_size
-    open_brick = probability_at_least(deck_size, brick, hand_size, 1)
-    no_brick_open = hypergeometric_probability(deck_size, brick, hand_size, 0)
-    sixth_brick = brick / remaining if remaining > 0 else 0.0
+    # Exact fractions, rounded to float once at the end
+    open_brick = exact_probability_at_least(deck_size, brick, hand_size, 1)
+    sixth_brick = Fraction(brick, remaining) if remaining > 0 else Fraction(0)
     bricks = {
-        "open": open_brick,
-        "draw_sixth": sixth_brick,
-        "by_turn_one": open_brick + no_brick_open * sixth_brick,
+        "open": float(open_brick),
+        "draw_sixth": float(sixth_brick),
+        "by_turn_one": float(open_brick + (1 - open_brick) * sixth_brick),
     }
 
     sixth_card = None
