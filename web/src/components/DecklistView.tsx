@@ -146,16 +146,14 @@ export const TagControls = memo(function TagControls({ editor, actions }: { edit
 });
 
 /** The deck's cards; click to tag, right-click to untag. `scroll` keeps them inside a fixed-height panel. */
-export const TagGrid = memo(function TagGrid({ editor, idByName, scroll = false, tileSize = 76 }: {
+export const TagGrid = memo(function TagGrid({ editor, idByName, scroll = false }: {
   editor: TagEditor;
   idByName: Record<string, string>;
   scroll?: boolean;
-  /** Smallest tile width in px; tiles grow to fill each row */
-  tileSize?: number;
 }) {
+  // 10 cards per row (5 on phones, where 10 would be too small to click); tiles scale to the width
   return (
-    <div className={`grid content-start gap-2 px-1 py-1.5 ${scroll ? "min-h-0 flex-1 overflow-y-auto" : ""}`}
-         style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` }}>
+    <div className={`grid grid-cols-5 content-start gap-2 px-1 py-1.5 sm:grid-cols-10 ${scroll ? "min-h-0 flex-1 overflow-y-auto" : ""}`}>
       {editor.deckList.map((name, index) => {
         const tag = editor.tags[index];
         return (

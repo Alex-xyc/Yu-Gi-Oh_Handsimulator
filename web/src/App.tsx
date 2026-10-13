@@ -93,7 +93,10 @@ export default function App() {
             <img className="logo" src="/icon-192.png" alt="" />
             <div>
               <h1>Hand Simulator</h1>
-              <span className="muted small">Yu-Gi-Oh! hypergeometric calculator · by Xin Yuan</span>
+              <span className="muted small">Yu-Gi-Oh! hypergeometric calculator · by Xin Yuan · </span>
+              {/* Outside the subtitle so it stays on phones: AGPL section 13 asks for a visible source link */}
+              <a className="source-link" href="https://github.com/Alex-xyc/Yu-Gi-Oh_Handsimulator"
+                 target="_blank" rel="noopener noreferrer">Source</a>
             </div>
           </div>
           <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>Compare decks</Button>

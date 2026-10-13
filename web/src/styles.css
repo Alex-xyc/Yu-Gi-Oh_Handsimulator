@@ -30,6 +30,8 @@
 .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
 .brand h1 { font-size: 21px; }
 .brand .small { font-size: 13.2px; }
+.source-link { font-size: 13.2px; color: var(--color-muted); text-decoration: underline; text-underline-offset: 2px; }
+.source-link:hover { color: var(--color-accent); }
 .logo { width: 48px; height: 48px; flex: none; border-radius: 50%; box-shadow: 0 6px 22px rgba(124, 92, 255, 0.4); }
 .layout { display: flex; flex-direction: column; gap: 16px; }
 /* No backdrop blur here or on overlays: Chrome drops it for a frame while an overlay fades in */
@@ -166,7 +168,9 @@ table { border-collapse: collapse; width: 100%; }
 .tag-tile.tagged { border-color: var(--tone); box-shadow: 0 0 18px color-mix(in srgb, var(--tone) 45%, transparent); }
 .tag-tile.tagged .tile-tint { opacity: 0.55; }
 .tile-badge { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 1px 8px; border-radius: 999px;
-              font-size: 10px; }
+              font-size: 10px; max-width: calc(100% - 6px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Ten tiles per row get narrow on smaller laptops: keep the label inside its card */
+@media (max-width: 1280px) { .tile-badge { padding: 1px 4px; font-size: 9px; } }
 
 /* Comparison */
 .compare-view { display: flex; flex-direction: column; gap: 14px; max-width: 1200px; margin: 0 auto; }

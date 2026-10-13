@@ -96,6 +96,20 @@ docker compose logs -f           # server log
 docker compose down              # stop (the image cache volume is kept)
 ```
 
+Deploy on Fly.io (`fly.toml`): the site runs at https://ygo-calc.fly.dev and the Deploy
+workflow redeploys it whenever CI passes on `main`. One-time setup, from this folder:
+
+```bash
+fly auth login                                           # install flyctl first: https://fly.io/docs/flyctl/install/
+fly apps create ygo-calc                                 # if the name is taken, pick another and update fly.toml
+fly volumes create ygo_cache --size 1 --region ams       # image cache, kept across deploys
+fly deploy                                               # first deploy
+fly scale count 1                                        # keep one machine (rate limits are per process)
+fly tokens create deploy                                 # add as the GitHub repo secret FLY_API_TOKEN
+```
+
+A custom domain can be added later with `fly certs add <domain>` plus the DNS records it prints.
+
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_WEB_DIST` (built front end),
 `YGO_API_DOCS=1` (serve the interactive API docs at /api/docs; off by default).
