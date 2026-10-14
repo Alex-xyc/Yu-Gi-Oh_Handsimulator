@@ -19,8 +19,11 @@ RUN pip install --no-cache-dir -r requirements-web.txt
 COPY src/ ./src/
 COPY --from=web /web/dist ./web/dist
 # Runs as an unprivileged user that can only write to the cache. Card images and EDOPro
-# databases are cached there (mount a volume to keep them).
-RUN useradd --system --no-create-home --shell /usr/sbin/nologin app && mkdir -p /cache && chown app:app /cache
+# databases are cached there (mount a volume to keep them). The fixed uid/gid 10001 lets a
+# Cloud Storage mount be given to this user (Cloud Run's mount-options uid/gid in deploy.yml).
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /cache && chown app:app /cache
 USER app
 ENV YGO_CACHE_DIR=/cache LOCALAPPDATA=/cache HOST=0.0.0.0 PORT=8000 PYTHONDONTWRITEBYTECODE=1
 # Hosting platforms and reverse proxies sit in front of the container: take each visitor's real
