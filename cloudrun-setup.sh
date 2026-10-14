@@ -15,8 +15,9 @@
 set -euo pipefail
 
 PROJECT_ID="${1:?usage: bash cloudrun-setup.sh <project-id>}"
-# us-central1: Cloud Run's cheaper price tier, and Cloud Storage's free 5 GB only applies in US regions
-REGION="${REGION:-us-central1}"
+# europe-west1 (Belgium): close to European visitors, in Cloud Run's cheaper price tier. (Cloud Storage's
+# free 5 GB only applies in US regions; the image cache costs cents a month here.)
+REGION="${REGION:-europe-west1}"
 GITHUB_REPO="${GITHUB_REPO:-Alex-xyc/Yu-Gi-Oh_Handsimulator}"
 
 BUCKET="${PROJECT_ID}-ygo-cache"
