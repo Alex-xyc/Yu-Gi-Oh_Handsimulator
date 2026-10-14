@@ -1,14 +1,16 @@
 """Card images for the web app, downloaded once and then served from a disk cache.
 
 YGOPRODeck asks sites not to hotlink its images, so the server fetches each image
-once and serves its own copy.
+once and serves its own copy. A freshly downloaded image is sent straight away and
+written to the cache in the background: on Cloud Run the cache is a Cloud Storage
+bucket, where writing a file takes a noticeable moment.
 """
 
 import logging
 import os
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Union
 
 from ..cards import cache
 from ..cards.edopro import EDOPRO_IMAGE_URL
@@ -30,6 +32,8 @@ MAX_MISSING = 10_000
 _locks: Dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
 _missing: Dict[str, float] = {}
+# Downloaded images still being written to the cache, by path, so they aren't downloaded again
+_saving: Dict[str, bytes] = {}
 
 
 def image_cache_dir() -> str:
@@ -53,9 +57,13 @@ def image_urls(card_id: str, size: str) -> List[str]:
     return list(dict.fromkeys(urls))
 
 
-def card_image_path(card_id: str, size: str) -> Optional[str]:
-    """Path of the cached image file, downloading it first if needed (None if unavailable)."""
+def load_card_image(card_id: str, size: str) -> Union[str, bytes, None]:
+    """A card's image: the cached file's path, or the image itself if it isn't in the cache yet
+    (it is downloaded, then saved in the background). None if no image is available."""
     path = os.path.join(image_cache_dir(), f"{card_id}_{size}.jpg")
+    data = _saving.get(path)
+    if data is not None:
+        return data
     if os.path.exists(path):
         return path
     if time.monotonic() < _missing.get(path, 0):
@@ -65,6 +73,9 @@ def card_image_path(card_id: str, size: str) -> Optional[str]:
         lock = _locks.setdefault(path, threading.Lock())
     try:
         with lock:
+            data = _saving.get(path)
+            if data is not None:
+                return data
             if os.path.exists(path):
                 return path
             for url in image_urls(card_id, size):
@@ -73,17 +84,33 @@ def card_image_path(card_id: str, size: str) -> Optional[str]:
                 except Exception:
                     logging.warning("Failed to load image for %s from %s", card_id, url)
                     continue
-                temp = f"{path}.{threading.get_ident()}.part"
-                with open(temp, "wb") as f:
-                    f.write(data)
-                os.replace(temp, path)
-                return path
+                _saving[path] = data
+                threading.Thread(target=_save, args=(path, data), daemon=True).start()
+                return data
             _remember_missing(path)
             return None
     finally:
         with _locks_guard:
             if _locks.get(path) is lock and not lock.locked():
                 del _locks[path]
+
+
+def _save(path: str, data: bytes):
+    """Write a downloaded image to the cache (in a background thread)."""
+    temp = f"{path}.{threading.get_ident()}.part"
+    try:
+        with open(temp, "wb") as f:
+            f.write(data)
+        os.replace(temp, path)
+    except OSError:
+        logging.exception("Failed to cache image %s", path)
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+    finally:
+        # Only now: until the file is in place, requests are answered from memory
+        _saving.pop(path, None)
 
 
 def _remember_missing(path: str):
