@@ -38,25 +38,28 @@ def parse_ydke_url(ydke_url: str) -> Tuple[List[str], List[str], List[str]]:
     return main_ids, extra_ids, side_ids
 
 
-def parse_ydk_main_ids(ydk_text: str) -> List[str]:
-    """Card IDs in the #main section of .ydk file text."""
+def parse_ydk_section_ids(ydk_text: str, section: str) -> List[str]:
+    """Card IDs in one section ("main", "extra" or "side") of .ydk file text."""
+    headers = {"#main": "main", "#extra": "extra", "!side": "side", "#side": "side"}
     card_ids = []
-    in_main_deck = False
+    current = None
     for line in ydk_text.splitlines():
         line = line.strip()
         if not line:
             continue
-        if line == "#main":
-            in_main_deck = True
-            continue
-        if line in ["#extra", "!side", "#side"]:
-            in_main_deck = False
+        if line in headers:
+            current = headers[line]
             continue
         if line.startswith("#") or line.startswith("!"):
             continue
-        if in_main_deck and line.isascii() and line.isdigit() and len(line) <= 10:
+        if current == section and line.isascii() and line.isdigit() and len(line) <= 10:
             card_ids.append(line)
     return card_ids
+
+
+def parse_ydk_main_ids(ydk_text: str) -> List[str]:
+    """Card IDs in the #main section of .ydk file text."""
+    return parse_ydk_section_ids(ydk_text, "main")
 
 
 def extract_main_deck_ids(deck_code: str) -> List[str]:
@@ -75,3 +78,11 @@ def extract_main_deck_ids(deck_code: str) -> List[str]:
     if not card_ids:
         raise DeckParseError("No main deck cards found.")
     return card_ids
+
+
+def extract_side_deck_ids(deck_code: str) -> List[str]:
+    """Side deck card IDs from a ydke:// URL or .ydk file text (empty if it has none)."""
+    deck_code = deck_code.strip()
+    if deck_code.startswith("ydke://"):
+        return parse_ydke_url(deck_code)[2]
+    return parse_ydk_section_ids(deck_code, "side")

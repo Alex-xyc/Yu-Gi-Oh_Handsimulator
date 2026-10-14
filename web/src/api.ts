@@ -32,6 +32,8 @@ export interface DeckSetupBody {
   cards: { name: string; copies: number }[];
   tags: Category[] | null;
   counts: Counts | null;
+  /** Per copy: whether it was sided in (left out when none were) */
+  sided?: boolean[];
 }
 
 export interface CardOdds {
@@ -63,6 +65,8 @@ export interface Stats {
 export interface DrawnCard {
   name: string;
   category: Category;
+  /** Whether this copy was sided in */
+  sided?: boolean;
 }
 
 export interface DrawResult {
@@ -126,7 +130,8 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 }
 
 export const api = {
-  loadDeck: (code: string) => post<{ cards: DeckCard[]; size: number }>("/api/decks", { code }),
+  /** The main deck and the side deck (empty if it has none) */
+  loadDeck: (code: string) => post<{ cards: DeckCard[]; side: DeckCard[]; size: number }>("/api/decks", { code }),
   /** Each card's kind and level by ID, for decks saved before the card list had them */
   cardInfo: (ids: string[]) => post<Record<string, { kind: string; level: number }>>("/api/decks/info", { ids }),
   /** handSize 6 gives the odds going second */

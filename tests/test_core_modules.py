@@ -14,7 +14,7 @@ from ygo_calc.core.categories import (BRICK, ENGINE, NON_ENGINE, UNTAGGED, count
                                       sync_category_sets)
 from ygo_calc.core.deck import YuGiOhDeck
 from ygo_calc.core.deck_builder import TooManyCopiesError, count_cards, fill_deck
-from ygo_calc.core.deck_parser import DeckParseError, extract_main_deck_ids
+from ygo_calc.core.deck_parser import DeckParseError, extract_main_deck_ids, extract_side_deck_ids
 from ygo_calc.core.report import format_card_odds, format_statistics_report
 from ygo_calc.core.simulation import draw_from_pool
 from ygo_calc.ui.text_layout import deck_list_lines, fit_font_size, hand_lines
@@ -58,6 +58,9 @@ class TestDeckParsingAndBuilding(unittest.TestCase):
     def test_extract_ids_from_ydk_and_ydke(self):
         self.assertEqual(extract_main_deck_ids("#main\n100\n200\n#extra\n300\n"), ['100', '200'])
         self.assertEqual(extract_main_deck_ids("ydke://AQAAAAIAAAA=!!"), ['1', '2'])
+        self.assertEqual(extract_side_deck_ids("#main\n100\n#extra\n300\n!side\n400\n500\n"), ['400', '500'])
+        self.assertEqual(extract_side_deck_ids("ydke://AQAAAA==!!AgAAAA==!"), ['2'])
+        self.assertEqual(extract_side_deck_ids("#main\n100\n"), [])
 
     def test_extract_ids_errors(self):
         with self.assertRaises(DeckParseError):

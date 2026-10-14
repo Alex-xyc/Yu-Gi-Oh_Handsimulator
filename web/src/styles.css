@@ -21,6 +21,7 @@
 .tone-brick { --tone: var(--color-brick); }
 .tone-deck-a { --tone: var(--color-deck-a); }
 .tone-deck-b { --tone: var(--color-deck-b); }
+.tone-side { --tone: var(--color-side); }
 .dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px;
        background: var(--tone, var(--color-muted)); box-shadow: 0 0 10px var(--tone, transparent); }
 
@@ -117,6 +118,8 @@
 .odds-groups .odds-rows:first-child { border-top: none; padding-top: 0; }
 .odds-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto; align-items: center; gap: 12px; }
 /* As wide as the longest value in the section (--value-ch characters), so the bars line up */
+/* Two value columns (going first and second); the first has the bar */
+.odds-row.two-values { grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto auto; }
 .odds-row .value { text-align: right; white-space: nowrap; min-width: max(58px, calc(var(--value-ch, 5) * 1ch)); }
 .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 65%, transparent), var(--tone));
@@ -215,6 +218,33 @@ table { border-collapse: collapse; width: 100%; }
 /* Ten tiles per row get narrow on smaller laptops: keep the label inside its card */
 @media (max-width: 1280px) { .tile-badge { padding: 1px 4px; font-size: 9px; } }
 
+/* Siding: cards picked to go out of the main deck (red) or come in from the side deck (green) */
+.side-tile { position: relative; display: block; width: 100%; padding: 0; border: none; border-radius: 7px; background: none;
+             cursor: pointer; transition: transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth); }
+.side-tile:hover { transform: translateY(-2px); }
+.side-tile:active { transform: scale(0.96); }
+.side-tile .card-image { border-radius: 7px; transition: opacity 0.2s; }
+.side-tile.out, .side-count.out { --pick: var(--color-danger); }
+.side-tile.in, .side-count.in { --pick: var(--color-ok); }
+.side-tile:is(.out, .in) { outline: 3px solid var(--pick); outline-offset: 2px;
+                           box-shadow: 0 0 16px color-mix(in srgb, var(--pick) 55%, transparent); }
+.side-tile:is(.out, .in) .card-image { opacity: 0.45; }
+/* The cards here are smaller than in the decklist: a tighter label that still fits */
+.side-tile .tile-badge { bottom: 4px; padding: 0 4px; font-size: 9px; }
+/* The keyboard focus ring sits outside a picked card's coloured outline */
+.side-tile:focus-visible { outline: none; }
+.side-tile:focus-visible::after { content: ""; position: absolute; inset: -7px; border: 2px solid var(--color-accent);
+                                  border-radius: 11px; pointer-events: none; }
+.side-tile:not(.out):not(.in):focus-visible::after { inset: -3px; border-radius: 9px; }
+.side-mark { position: absolute; top: 4px; right: 4px; padding: 0 6px; border-radius: 999px; background: var(--pick);
+             color: var(--color-ink); font-size: 10px; font-weight: 800; line-height: 16px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+/* A card that's out of the deck it started in (sided in, or sided out): a light blue dot, top left */
+.side-dot { position: absolute; top: 4px; left: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-side);
+            box-shadow: 0 0 0 1.5px rgba(5, 6, 10, 0.75), 0 0 6px var(--color-side); pointer-events: none; }
+.side-dot.static { position: static; display: inline-block; flex: none; }
+.side-count { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 18px;
+              background: var(--pick); color: var(--color-ink); }
+
 /* Comparison */
 .compare-view { display: flex; flex-direction: column; gap: 14px; max-width: 1200px; margin: 0 auto; }
 .compare-view .card-panel { box-shadow: none; }
@@ -271,6 +301,7 @@ table { border-collapse: collapse; width: 100%; }
   .better-tag { display: none; }
   .compare-table td:not(:first-child), .compare-table th:not(:first-child) { width: 74px; }
   .odds-row { grid-template-columns: 1fr auto; }
+  .odds-row.two-values { grid-template-columns: 1fr auto auto; }
   .odds-row .bar { grid-column: 1 / -1; grid-row: 2; }
   .overlay-backdrop.window { padding: 16px; }
   .overlay-backdrop.window .overlay-panel { max-height: 100%; }

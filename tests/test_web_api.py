@@ -75,6 +75,21 @@ class TestWebApi(unittest.TestCase):
         self.assertEqual(data["size"], 40)
         self.assertEqual(data["cards"][0], {"name": "Card 100", "id": "100", "copies": 3, "kind": "monster", "level": 4})
         self.assertEqual(data["cards"][1]["kind"], "spell_quick_play")
+        self.assertEqual(data["side"], [])
+
+    def test_load_side_deck(self):
+        code = YDK + "200\n900\n900\n"
+        data = self.client.post("/api/decks", json={"code": code}).json()
+        self.assertEqual(data["size"], 40)
+        self.assertEqual(data["side"], [
+            {"name": "Card 200", "id": "200", "copies": 1, "kind": "spell_quick_play", "level": 4},
+            {"name": "Card 900", "id": "900", "copies": 2, "kind": "monster", "level": 4},
+        ])
+
+    def test_side_deck_too_big(self):
+        response = self.client.post("/api/decks", json={"code": YDK + "900\n" * 16})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("side deck", response.json()["detail"])
 
     def test_card_infos(self):
         response = self.client.post("/api/decks/info", json={"ids": ["200", "200", "x1"]})
@@ -111,6 +126,14 @@ class TestWebApi(unittest.TestCase):
         self.assertEqual(len(data["deck"]), 40)
         self.assertEqual(data["deck"][:5], data["hand"])
         self.assertIsNotNone(data["stats"]["sixth_card"])
+
+    def test_draw_marks_sided_cards(self):
+        sided = [True] * 3 + [False] * 37  # the three copies of Card 100
+        data = self.client.post("/api/draw", json={"deck": setup_body(sided=sided)}).json()
+        for card in data["deck"]:
+            self.assertEqual(card["sided"], card["name"] == "Card 100")
+        response = self.client.post("/api/draw", json={"deck": setup_body(sided=[True])})
+        self.assertEqual(response.status_code, 400)
 
     def test_tags_must_match_deck(self):
         response = self.client.post("/api/draw", json={"deck": setup_body(tags=[ENGINE] * 3)})
