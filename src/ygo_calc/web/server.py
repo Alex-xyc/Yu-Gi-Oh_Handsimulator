@@ -3,7 +3,7 @@
 The server keeps no per-user state: the browser holds the deck and its tags or
 counts and sends them with each request.
 
-    POST /api/decks                  deck code -> card list
+    POST /api/decks                  deck code -> main and side deck card lists
     POST /api/decks/info             card IDs -> each card's kind and level (for decks saved before
                                      the card list had them)
     POST /api/stats                  deck setup -> opening-hand odds
@@ -20,7 +20,7 @@ Copyright (c) 2026 Alex-xyc
 import os
 import random
 import re
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -34,7 +34,7 @@ from ..core.deck import YuGiOhDeck
 from ..core.deck_builder import TooManyCopiesError
 from ..core.deck_parser import DeckParseError
 from ..core.stats import opening_stats
-from ..deck_loading import load_main_deck
+from ..deck_loading import load_main_deck, load_side_deck
 from ..paths import SRC_DIR
 from .images import SIZES, card_image_path
 from .security import SecurityMiddleware
@@ -68,6 +68,8 @@ class DeckSetup(BaseModel):
     cards: List[Card] = Field(min_length=1, max_length=YuGiOhDeck.MAX_DECK_SIZE)
     tags: Optional[List[Literal["brick", "non_engine", "engine", ""]]] = None
     counts: Optional[Counts] = None
+    # Per copy, in deck order: whether it was swapped in from the side deck (the draw marks those cards)
+    sided: Optional[List[bool]] = Field(None, max_length=YuGiOhDeck.MAX_DECK_SIZE)
 
     def build(self) -> YuGiOhDeck:
         deck = YuGiOhDeck()
@@ -122,17 +124,23 @@ CARD_ID = re.compile(r"[0-9]{1,10}")
 
 @app.post("/api/decks")
 def load_deck(body: DeckCode):
-    """Look up a ydke:// code or .ydk file text; returns the main deck in deck order, with each
-    card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for sorting."""
+    """Look up a ydke:// code or .ydk file text; returns the main and side decks in deck order,
+    with each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for
+    sorting."""
     deck = YuGiOhDeck()
     try:
         card_ids = load_main_deck(deck, body.code)
+        side_counts, side_ids = load_side_deck(body.code)
     except (DeckParseError, TooManyCopiesError) as e:
         raise HTTPException(400, str(e)) from e
-    infos = fetch_card_infos([card_ids.get(name, "") for name in deck.cards])
-    cards = [{"name": name, "id": card_ids.get(name, ""), "copies": copies, **infos[card_ids.get(name, "")]}
-             for name, copies in deck.cards.items()]
-    return {"cards": cards, "size": deck.get_deck_size()}
+    main = [(name, card_ids.get(name, ""), copies) for name, copies in deck.cards.items()]
+    side = [(name, side_ids.get(name, ""), copies) for name, copies in side_counts.items()]
+    infos = fetch_card_infos(list(dict.fromkeys(cid for _, cid, _ in main + side)))
+
+    def listed(cards):
+        return [{"name": name, "id": cid, "copies": copies, **infos[cid]} for name, cid, copies in cards]
+
+    return {"cards": listed(main), "side": listed(side), "size": deck.get_deck_size()}
 
 
 class CardIds(BaseModel):
@@ -152,20 +160,24 @@ def stats(body: DeckSetup, hand_size: int = Query(5, ge=5, le=6)):
     return opening_stats(body.pool(), hand_size=hand_size, grouped=body.tagged)
 
 
-def _drawn(cards: CardPool) -> List[dict]:
-    return [{"name": name, "category": category} for name, category in cards]
+def _drawn(cards: List[Tuple[str, str, bool]]) -> List[dict]:
+    return [{"name": name, "category": category, "sided": sided} for name, category, sided in cards]
 
 
 @app.post("/api/draw")
 def draw(body: DrawRequest):
     """Shuffle and draw 5 cards, the 6th (the next card, going second) and the 4 cards after it
     (extra draws), plus the whole shuffled deck in order; odds include the 6th-card odds for this
-    hand when the deck is tagged by card."""
+    hand when the deck is tagged by card. Each card says whether it was sided in."""
     setup = body.deck
     pool = list(setup.pool())
-    deck = random.sample(pool, len(pool))
+    sided = setup.sided or [False] * len(pool)
+    if len(sided) != len(pool):
+        raise HTTPException(400, "Sided-in cards don't match the deck.")
+    # The pool is in deck order, as are the sided-in flags
+    deck = [(*pool[i], sided[i]) for i in random.sample(range(len(pool)), len(pool))]
     hand, after = deck[:5], deck[5:10]
-    categories = [c for _, c in hand]
+    categories = [c for _, c, _ in hand]
     return {
         "hand": _drawn(hand),
         "sixth": _drawn(after[:1])[0] if after else None,

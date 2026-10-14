@@ -2,7 +2,8 @@
 // mounted (hidden when not selected), so switching tabs keeps its hand, undo history and input.
 
 import Button from "@mui/material/Button";
-import { useCallback, useEffect, useId, useState } from "react";
+import Tooltip from "@mui/material/Tooltip";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { api, DrawResult, Stats } from "../api";
 import { exportStats } from "../export";
 import { DeckSetup } from "../useDeckSetup";
@@ -12,7 +13,8 @@ import { ExportButton } from "./ExportButton";
 import { SortControls, TagControls, TagGrid, useDeckOrder, useTagEditor } from "./DecklistView";
 import { HandView } from "./HandView";
 import { ShuffledDeckView } from "./ShuffledDeckView";
-import { StatsView } from "./StatsView";
+import { SideDeckView } from "./SideDeckView";
+import { SidedCard, StatsView } from "./StatsView";
 
 export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   setup: DeckSetup;
@@ -30,6 +32,11 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   const [drawing, setDrawing] = useState(false);
   const [showingDeck, setShowingDeck] = useState(false);
   const closeDeck = useCallback(() => setShowingDeck(false), []);
+  // Each opening of the side deck window starts with nothing picked
+  const [siding, setSiding] = useState(false);
+  const [sideOpenings, setSideOpenings] = useState(0);
+  const openSide = () => { setSiding(true); setSideOpenings((n) => n + 1); };
+  const closeSide = useCallback(() => setSiding(false), []);
   const id = useId();
 
   // A new deck clears the old hand
@@ -77,8 +84,14 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   // Labelling on the page: the controls and the cards are in different panels
   const editor = useTagEditor({
     deckList: setup.deckList, tags: setup.tags, onChange: setup.applyTags,
-    shortcuts: active && shortcuts && !showingDeck,
+    shortcuts: active && shortcuts && !showingDeck && !siding,
   });
+  // The cards with copies sided in, in deck order, for their odds
+  const sidedCards = useMemo((): SidedCard[] => (setup.cards ?? []).flatMap((card) => {
+    const start = setup.deckList.indexOf(card.name);
+    const sided = setup.sided.slice(start, start + card.copies).filter(Boolean).length;
+    return sided ? [{ name: card.name, copies: card.copies, sided }] : [];
+  }), [setup.cards, setup.deckList, setup.sided]);
   const deckOrder = useDeckOrder(setup.cards, setup.deckList, setup.tags);
 
   return (
@@ -116,9 +129,22 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
                  aria-labelledby={`${id}-list`}>
           <SectionHeader as="h2" id={`${id}-list`} title="Decklist"
                          hint={setup.cards ? `· ${setup.size} cards` : undefined}
-                         action={setup.cards ? <SortControls deckOrder={deckOrder} /> : undefined} />
+                         action={setup.cards ? (
+                           <div className="flex flex-wrap items-center gap-3">
+                             <SortControls deckOrder={deckOrder} />
+                             <Tooltip title={!setup.side ? "This deck was saved before side decks were kept: load it again to get its side deck"
+                                             : setup.side.length ? `Swap cards with the side deck (${setup.sideList.length} cards)`
+                                             : "This deck has no side deck"}>
+                               <span>
+                                 <Button variant="outlined" size="small" onClick={openSide} disabled={!setup.side?.length}>
+                                   Side deck
+                                 </Button>
+                               </span>
+                             </Tooltip>
+                           </div>
+                         ) : undefined} />
           {setup.cards ? (
-            <TagGrid editor={editor} idByName={setup.idByName} order={deckOrder.order} onMove={deckOrder.move} scroll />
+            <TagGrid editor={editor} idByName={setup.idByName} sided={setup.sided} order={deckOrder.order} onMove={deckOrder.move} scroll />
           ) : (
             <p className="m-0 grid flex-1 place-items-center p-6 text-center text-muted">
               Load a deck, then click its cards to label them as engine, non-engine or brick.
@@ -131,10 +157,15 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
         {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} onClose={closeDeck} />}
       </Overlay>
 
+      <Overlay open={siding && setup.cards !== null} onClose={closeSide} label="Side deck" asWindow fit>
+        {setup.cards && <SideDeckView key={sideOpenings} setup={setup} onClose={closeSide} />}
+      </Overlay>
+
       <section className="card-panel stats-panel min-h-[320px]" aria-labelledby={`${id}-stats`}>
         <SectionHeader as="h2" id={`${id}-stats`} title="Probabilities"
                        action={<ExportButton disabled={!stats} onError={onError} onExport={exportAll} />} />
-        <StatsView stats={stats} tagged={setup.labelled} hasHand={draw !== null} />
+        <StatsView stats={stats} tagged={setup.labelled} hasHand={draw !== null} sidedCards={sidedCards}
+                   sidedInHand={draw ? draw.hand.filter((card) => card.sided).length : null} />
       </section>
     </main>
   );

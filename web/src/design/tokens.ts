@@ -42,6 +42,8 @@ export const colors = {
   "deck-b": "#f472b6",
   /** The 6th card's marker: Okabe–Ito sky blue, readable with colour blindness */
   sixth: "#56b4e9",
+  /** Cards swapped in from the side deck: a lighter sky blue, apart from the 6th card's */
+  side: "#7dd3fc",
   /** Status text */
   ok: "#4ade80",
   danger: "#f87171",

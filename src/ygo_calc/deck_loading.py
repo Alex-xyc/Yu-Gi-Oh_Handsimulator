@@ -1,11 +1,11 @@
 """Loading a deck code (ydke:// or .ydk text) into a deck, shared by the desktop and web apps."""
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from .cards import fetch_multiple_card_names
 from .core.deck import YuGiOhDeck
 from .core.deck_builder import count_cards, fill_deck
-from .core.deck_parser import DeckParseError, extract_main_deck_ids
+from .core.deck_parser import DeckParseError, extract_main_deck_ids, extract_side_deck_ids
 
 
 def load_main_deck(deck: YuGiOhDeck, deck_code: str) -> Dict[str, str]:
@@ -23,3 +23,21 @@ def load_main_deck(deck: YuGiOhDeck, deck_code: str) -> Dict[str, str]:
     card_counts, card_id_map = count_cards(card_ids, card_database)
     fill_deck(deck, card_counts)
     return card_id_map
+
+
+MAX_SIDE_SIZE = 15
+
+
+def load_side_deck(deck_code: str) -> Tuple[Dict[str, int], Dict[str, str]]:
+    """The code's side deck as copies per card name (in deck order) plus name -> card ID; both
+    empty if it has none.
+
+    Raises DeckParseError if the side deck has more than MAX_SIDE_SIZE cards.
+    """
+    card_ids = extract_side_deck_ids(deck_code)
+    if len(card_ids) > MAX_SIDE_SIZE:
+        raise DeckParseError(f"The side deck has {len(card_ids)} cards; at most {MAX_SIDE_SIZE} are allowed.")
+    if not card_ids:
+        return {}, {}
+    card_database = fetch_multiple_card_names(list(set(card_ids)), verbose=False)
+    return count_cards(card_ids, card_database)

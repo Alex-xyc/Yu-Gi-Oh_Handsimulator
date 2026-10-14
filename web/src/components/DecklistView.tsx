@@ -274,9 +274,11 @@ function dragGhost(tile: HTMLElement, count: number): HTMLElement {
  *  Shift- or Ctrl-click picks several cards (click one again to drop it, Esc to drop them all)
  *  and dragging any of them moves them together. There's deliberately no drag-a-box selection:
  *  a press-and-drag always moves cards. `scroll` keeps the cards inside a fixed-height panel. */
-export const TagGrid = memo(function TagGrid({ editor, idByName, order, onMove, scroll = false }: {
+export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, onMove, scroll = false }: {
   editor: TagEditor;
   idByName: Record<string, string>;
+  /** Per copy, in deck order: whether it was sided in (marked with a dot) */
+  sided?: boolean[];
   /** Deck positions in the order shown */
   order: number[];
   onMove: (cards: number[], target: number, after: boolean) => void;
@@ -330,6 +332,11 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, order, onMove, 
         ) : (
           <span>Drag a card to move it · <b className="font-semibold text-text">Shift+click</b> to select several and move them together</span>
         )}
+        {sided?.some(Boolean) && (
+          <span className={`flex items-center gap-1.5 ${selected.size ? "" : "ml-auto"}`}>
+            <i className="side-dot static" aria-hidden="true" />Sided in
+          </span>
+        )}
       </div>
       <div className={`grid select-none grid-cols-5 content-start gap-2 px-1.5 py-1.5 sm:grid-cols-10 ${scroll ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : ""}`}
            // A click on the space between cards drops the selection; dragging past the last card
@@ -353,6 +360,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, order, onMove, 
           const name = editor.deckList[index];
           const tag = editor.tags[index];
           const isSelected = selected.has(index);
+          const isSided = sided?.[index] ?? false;
           const drop = dropTarget?.index === index ? (dropTarget.after ? "drop-after" : "drop-before") : "";
           return (
             <motion.div key={index}
@@ -360,9 +368,9 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, order, onMove, 
                         transition={{ delay: Math.min(position * 0.008, 0.3) }}>
               <div role="button" tabIndex={0} draggable aria-pressed={isSelected}
                    className={`tag-tile ${tag ? `tagged tone-${tag}` : ""} ${isSelected ? "selected" : ""} ${dragging?.includes(index) ? "dragging" : ""} ${drop}`}
-                   aria-label={`${name}, ${tag ? CATEGORY_LABELS[tag] : "unlabelled"}${isSelected ? ", selected" : ""}`}
+                   aria-label={`${name}, ${tag ? CATEGORY_LABELS[tag] : "unlabelled"}${isSided ? ", sided in" : ""}${isSelected ? ", selected" : ""}`}
                    // No name tooltip while dragging
-                   title={dragging ? undefined : name}
+                   title={dragging ? undefined : isSided ? `${name} (sided in)` : name}
                    // Shift-click would otherwise select the page's text
                    onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                    onClick={(e) => click(e, index)}
@@ -399,6 +407,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, order, onMove, 
                 <CardImage id={idByName[name]} name={name} />
                 <span className="tile-tint" />
                 {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
+                {isSided && <i className="side-dot" aria-hidden="true" />}
                 {isSelected && (
                   <span className="tile-check" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="12" height="12">

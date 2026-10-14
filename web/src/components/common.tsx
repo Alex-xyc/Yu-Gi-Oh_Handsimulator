@@ -229,7 +229,7 @@ export function Bar({ value, tone }: { value: number; tone: string }) {
 }
 
 /** A colour of a label or deck, as used by the tone-* classes */
-export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged";
+export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
 
 /** The tone of a deck in the comparison: side 0 is deck A (blue), side 1 deck B (pink) */
 export const deckTone = (side: number): Tone => (side ? "deck-b" : "deck-a");
