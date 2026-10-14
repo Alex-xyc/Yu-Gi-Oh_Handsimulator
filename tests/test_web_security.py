@@ -101,12 +101,56 @@ class TestMissingImages(unittest.TestCase):
         with patch.object(images, "fetch_bytes", side_effect=OSError("offline")) as fetch, \
              patch.object(images, "image_cache_dir", return_value=os.path.join(ROOT, "tests")):
             images._missing.clear()
-            self.assertIsNone(images.card_image_path("999999991", "small"))
+            self.assertIsNone(images.load_card_image("999999991", "small"))
             calls = fetch.call_count
-            self.assertIsNone(images.card_image_path("999999991", "small"))
+            self.assertIsNone(images.load_card_image("999999991", "small"))
             self.assertEqual(fetch.call_count, calls)  # remembered as missing
             self.assertEqual(images._locks, {})        # no lock left behind
         images._missing.clear()
+
+
+@unittest.skipIf(TestClient is None, "web dependencies not installed")
+class TestNewImages(unittest.TestCase):
+    def test_downloaded_image_sent_at_once_then_cached(self):
+        import tempfile
+        import time
+        from ygo_calc.web import images
+        with tempfile.TemporaryDirectory() as cache_dir, \
+             patch.object(images, "fetch_bytes", return_value=b"jpeg") as fetch, \
+             patch.object(images, "image_cache_dir", return_value=cache_dir):
+            self.assertEqual(images.load_card_image("999999992", "small"), b"jpeg")
+            # Saved in the background; until then it's answered from memory, not downloaded again
+            deadline = time.monotonic() + 5
+            while images._saving and time.monotonic() < deadline:
+                self.assertIn(images.load_card_image("999999992", "small"), (b"jpeg", os.path.join(cache_dir, "999999992_small.jpg")))
+                time.sleep(0.01)
+            path = os.path.join(cache_dir, "999999992_small.jpg")
+            self.assertEqual(images.load_card_image("999999992", "small"), path)
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"jpeg")
+            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(os.listdir(cache_dir), ["999999992_small.jpg"])  # no temp file left
+
+    def test_api_serves_new_and_cached_images(self):
+        import tempfile
+        import time
+        from ygo_calc.web import images
+        from ygo_calc.web.server import app
+        client = TestClient(app)
+        with tempfile.TemporaryDirectory() as cache_dir, \
+             patch.object(images, "fetch_bytes", return_value=b"jpeg"), \
+             patch.object(images, "image_cache_dir", return_value=cache_dir):
+            response = client.get("/api/cards/999999993/image")      # just downloaded
+            self.assertEqual((response.status_code, response.content), (200, b"jpeg"))
+            self.assertEqual(response.headers["content-type"], "image/jpeg")
+            self.assertIn("immutable", response.headers["cache-control"])
+            deadline = time.monotonic() + 5
+            while images._saving and time.monotonic() < deadline:   # the background save
+                time.sleep(0.01)
+            self.assertEqual(os.listdir(cache_dir), ["999999993_small.jpg"])
+            response = client.get("/api/cards/999999993/image")      # now from the cache file
+            self.assertEqual((response.status_code, response.content), (200, b"jpeg"))
+            self.assertIn("immutable", response.headers["cache-control"])
 
 
 class TestOutboundRequests(unittest.TestCase):

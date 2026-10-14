@@ -23,7 +23,7 @@ import re
 from typing import List, Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ from ..core.deck_parser import DeckParseError
 from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck, load_side_deck
 from ..paths import SRC_DIR
-from .images import SIZES, card_image_path
+from .images import SIZES, load_card_image
 from .security import SecurityMiddleware
 
 # web/dist next to src/, unless YGO_WEB_DIST points elsewhere
@@ -197,12 +197,15 @@ def compare(body: CompareRequest):
 def card_image(card_id: str, size: Literal["small", "full"] = "small"):
     if not CARD_ID.fullmatch(card_id) or size not in SIZES:
         raise HTTPException(404)
-    path = card_image_path(card_id, size)
-    if path is None:
+    image = load_card_image(card_id, size)
+    if image is None:
         raise HTTPException(404)
     # Card art never changes for an ID, so browsers may keep it for a long time
-    return FileResponse(path, media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=2592000, immutable"})
+    headers = {"Cache-Control": "public, max-age=2592000, immutable"}
+    if isinstance(image, bytes):
+        # Just downloaded, and still being saved to the cache
+        return Response(image, media_type="image/jpeg", headers=headers)
+    return FileResponse(image, media_type="image/jpeg", headers=headers)
 
 
 if os.path.isdir(WEB_DIST):
