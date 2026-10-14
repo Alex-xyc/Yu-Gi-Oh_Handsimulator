@@ -101,21 +101,21 @@ Deploy on Google Cloud Run: the Deploy workflow (`.github/workflows/deploy.yml`)
 image and deploys it whenever CI passes on `main`. The service scales to zero when idle (the
 first visit after a quiet spell takes a few seconds), runs at most one instance (the rate
 limits are per process), and keeps card images in a Cloud Storage bucket mounted at `/cache`.
-At hobby traffic this stays within Google Cloud's free tier. One-time setup:
+At hobby traffic this costs nothing or a few cents a month. One-time setup:
 
 1. Create a project at https://console.cloud.google.com and link a billing account (a card
    is required even for free usage). Consider adding a budget alert under Billing > Budgets.
 2. Open Cloud Shell (the `>_` button), upload `cloudrun-setup.sh` and run it:
-   `bash cloudrun-setup.sh <project-id>` (it defaults to region `us-central1`; set `REGION=...`
+   `bash cloudrun-setup.sh <project-id>` (it defaults to region `europe-west1`; set `REGION=...`
    to change that).
 3. Add the four repository variables it prints in GitHub (Settings > Secrets and variables >
    Actions > Variables).
 4. Push to `main`, or re-run the latest Deploy workflow. The log prints the site's URL
    (`https://ygo-calc-....run.app`).
 
-Server log: `gcloud run services logs read ygo-calc --region us-central1`. A custom domain
+Server log: `gcloud run services logs read ygo-calc --region europe-west1`. A custom domain
 can be added with `gcloud beta run domain-mappings create --service ygo-calc --domain <domain>
---region us-central1` plus the DNS records it prints.
+--region europe-west1` plus the DNS records it prints.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_WEB_DIST` (built front end),

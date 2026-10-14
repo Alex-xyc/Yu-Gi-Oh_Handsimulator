@@ -1,6 +1,7 @@
 # Deploys the web app to Google Cloud Run once CI has passed on main.
-# Needs the repository variables GCP_PROJECT_ID, GCP_REGION, GCP_WORKLOAD_IDENTITY_PROVIDER and
-# GCP_DEPLOY_SERVICE_ACCOUNT, which cloudrun-setup.sh prints (see README "Deploy on Google Cloud Run").
+# Needs GCP_PROJECT_ID, GCP_REGION, GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOY_SERVICE_ACCOUNT, which
+# cloudrun-setup.sh prints (see README "Deploy on Google Cloud Run"). They aren't secret, so repository
+# variables are the place for them, but repository secrets with the same names work too.
 
 name: Deploy
 
@@ -23,10 +24,24 @@ jobs:
       contents: read
       id-token: write   # signs in to Google Cloud with Workload Identity Federation (no stored key)
     env:
-      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      REGION: ${{ vars.GCP_REGION }}
-      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ygo-calc/web:${{ github.event.workflow_run.head_sha }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER || secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT || secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
     steps:
+      - name: Check the Google Cloud settings
+        run: |
+          missing=0
+          for name in PROJECT_ID REGION WORKLOAD_IDENTITY_PROVIDER DEPLOY_SERVICE_ACCOUNT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::GCP_$name is not set. Add it under Settings > Secrets and variables > Actions > Variables."
+              missing=1
+            fi
+          done
+          if [ "$missing" = 1 ]; then exit 1; fi
+          # The image name, built here as the env block can't refer to its own entries
+          echo "IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/ygo-calc/web:${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+
       - name: Checkout the tested commit
         uses: actions/checkout@v4
         with:
@@ -35,8 +50,8 @@ jobs:
       - name: Sign in to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SERVICE_ACCOUNT }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v3
