@@ -53,6 +53,7 @@ web/                      The web front end (React + TypeScript, Vite)
   src/components/           Deck loading, hand, statistics, tagging and compare views
 tests/                    Unit tests (python -m unittest discover -s tests)
 Dockerfile  compose.yaml  Builds and runs the web app with Docker
+cloudrun-setup.sh         One-time Google Cloud setup for the Cloud Run deploy
 ```
 
 Quick start
@@ -96,19 +97,25 @@ docker compose logs -f           # server log
 docker compose down              # stop (the image cache volume is kept)
 ```
 
-Deploy on Fly.io (`fly.toml`): the site runs at https://ygo-calc.fly.dev and the Deploy
-workflow redeploys it whenever CI passes on `main`. One-time setup, from this folder:
+Deploy on Google Cloud Run: the Deploy workflow (`.github/workflows/deploy.yml`) builds the
+image and deploys it whenever CI passes on `main`. The service scales to zero when idle (the
+first visit after a quiet spell takes a few seconds), runs at most one instance (the rate
+limits are per process), and keeps card images in a Cloud Storage bucket mounted at `/cache`.
+At hobby traffic this stays within Google Cloud's free tier. One-time setup:
 
-```bash
-fly auth login                                           # install flyctl first: https://fly.io/docs/flyctl/install/
-fly apps create ygo-calc                                 # if the name is taken, pick another and update fly.toml
-fly volumes create ygo_cache --size 1 --region ams       # image cache, kept across deploys
-fly deploy                                               # first deploy
-fly scale count 1                                        # keep one machine (rate limits are per process)
-fly tokens create deploy                                 # add as the GitHub repo secret FLY_API_TOKEN
-```
+1. Create a project at https://console.cloud.google.com and link a billing account (a card
+   is required even for free usage). Consider adding a budget alert under Billing > Budgets.
+2. Open Cloud Shell (the `>_` button), upload `cloudrun-setup.sh` and run it:
+   `bash cloudrun-setup.sh <project-id>` (it defaults to region `us-central1`; set `REGION=...`
+   to change that).
+3. Add the four repository variables it prints in GitHub (Settings > Secrets and variables >
+   Actions > Variables).
+4. Push to `main`, or re-run the latest Deploy workflow. The log prints the site's URL
+   (`https://ygo-calc-....run.app`).
 
-A custom domain can be added later with `fly certs add <domain>` plus the DNS records it prints.
+Server log: `gcloud run services logs read ygo-calc --region us-central1`. A custom domain
+can be added with `gcloud beta run domain-mappings create --service ygo-calc --domain <domain>
+--region us-central1` plus the DNS records it prints.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_WEB_DIST` (built front end),
