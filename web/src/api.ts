@@ -146,6 +146,45 @@ export function cardImageUrl(id: string | undefined, size: "small" | "full" = "s
   return id && /^\d+$/.test(id) ? `/api/cards/${id}/image?size=${size}` : null;
 }
 
+/** Image URLs this page has already loaded: the browser has them in memory, so a card showing one
+ *  again can show it at once instead of fading it in over the card's name */
+export const loadedImages = new Set<string>();
+const prefetchQueue: string[] = [];
+const queued = new Set<string>();
+let prefetching = 0;
+/** A few at a time, so warming the cache never competes with the images on screen (or floods the
+ *  server, which downloads any it doesn't have yet) */
+const PREFETCH_AT_ONCE = 3;
+
+/** Load card images in the background, so they show at once when needed (e.g. the test hand's
+ *  full-size images while the decklist shows small ones) */
+export function prefetchCardImages(ids: string[], size: "small" | "full") {
+  for (const id of ids) {
+    const url = cardImageUrl(id, size);
+    if (url && !loadedImages.has(url) && !queued.has(url)) {
+      queued.add(url);
+      prefetchQueue.push(url);
+    }
+  }
+  while (prefetching < PREFETCH_AT_ONCE && prefetchQueue.length) prefetchNext();
+}
+
+function prefetchNext() {
+  const url = prefetchQueue.shift();
+  if (!url) return;
+  prefetching++;
+  const image = new Image();
+  const done = (loaded: boolean) => {
+    if (loaded) loadedImages.add(url);
+    prefetching--;
+    prefetchNext();
+  };
+  image.onload = () => done(true);
+  // Left in `queued`, so a missing image isn't asked for again
+  image.onerror = () => done(false);
+  image.src = url;
+}
+
 /** Decimals to show value with: digits, or more for a small non-zero value so it doesn't round to 0
  * (two significant figures, e.g. 0.022) */
 export function decimalsFor(value: number, digits = 1): number {

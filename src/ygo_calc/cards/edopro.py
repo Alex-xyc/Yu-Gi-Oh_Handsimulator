@@ -3,9 +3,11 @@
 import logging
 import os
 import re
+import shutil
 import sqlite3
+import threading
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from . import cache
 from .http import fetch_bytes, fetch_json
@@ -46,9 +48,25 @@ def _edopro_cache_dir() -> str:
     return path
 
 
+# The database listing is asked for at most this often (GitHub allows 60 unauthenticated API
+# requests an hour), and a database that failed to download isn't tried again for RETRY_SECONDS
+LIST_MAX_AGE = 6 * 60 * 60
+RETRY_SECONDS = 10 * 60
+
+# (when the listing should be asked for again, the database names)
+_names_cache: Tuple[float, List[str]] = (0.0, [])
+_download_lock = threading.Lock()
+_failed_at: Dict[str, float] = {}
+
+
 def _edopro_cdb_names() -> List[str]:
     """List the BabelCDB databases to search (main card pool plus pre-releases)."""
+    global _names_cache
+    expires, cached = _names_cache
+    if cached and time.monotonic() < expires:
+        return list(cached)
     names = list(EDOPRO_CDB_FILES)
+    max_age = LIST_MAX_AGE
     try:
         for entry in fetch_json(EDOPRO_CDB_LIST_URL, timeout=10, accept_json=False):
             name = entry.get('name', '') if isinstance(entry, dict) else ''
@@ -58,25 +76,107 @@ def _edopro_cdb_names() -> List[str]:
                 names.append(name)
     except Exception:
         logging.exception("Failed to list EDOPro card databases; using defaults")
-    return names
+        # The defaults for now; ask again sooner
+        max_age = RETRY_SECONDS
+    _names_cache = (time.monotonic() + max_age, names)
+    return list(names)
+
+
+def _edopro_store_dir() -> str:
+    """Where downloaded databases are also kept so they outlive the server: $YGO_CACHE_DIR/edopro
+    (on Cloud Run the Cloud Storage bucket, while the databases are used from the container's own
+    /tmp, as SQLite needs file locking the bucket mount doesn't have). "" when there's no such
+    folder, or it's the folder the databases are used from anyway."""
+    base = os.environ.get('YGO_CACHE_DIR')
+    if not base:
+        return ''
+    path = os.path.join(base, 'edopro')
+    if os.path.normcase(os.path.abspath(path)) == os.path.normcase(os.path.abspath(_edopro_cache_dir())):
+        return ''
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _is_fresh(path: str) -> bool:
+    return os.path.exists(path) and time.time() - os.path.getmtime(path) < EDOPRO_CACHE_MAX_AGE
+
+
+def _copy_into_place(source: str, target: str):
+    """Copy a file (keeping its modified time, which says how old the database is) beside the
+    target and then swap it in, so nobody reads a half-written database."""
+    temp = f"{target}.{threading.get_ident()}.part"
+    try:
+        shutil.copy2(source, temp)
+        os.replace(temp, target)
+    except BaseException:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        raise
 
 
 def _edopro_cdb_path(name: str) -> str:
-    """Return a local path to an EDOPro CDB, downloading it if missing or stale."""
+    """Return a local path to an EDOPro CDB: the local copy, else the stored one (see
+    _edopro_store_dir), else downloaded (and stored). A stale copy is used if a new one
+    can't be had."""
+    # The name becomes part of file paths and a URL: plain names only
+    if not SAFE_CDB_NAME.fullmatch(name):
+        logging.error("Unexpected EDOPro database name %r", name)
+        return ''
     path = os.path.join(_edopro_cache_dir(), name)
-    if os.path.exists(path) and time.time() - os.path.getmtime(path) < EDOPRO_CACHE_MAX_AGE:
+    if _is_fresh(path):
         return path
+    # One at a time (the databases are large), and no download while a recent one failed
+    with _download_lock:
+        if _is_fresh(path):
+            return path
+        store = _edopro_store_dir()
+        stored = os.path.join(store, name) if store else ''
+        if stored and _is_fresh(stored):
+            try:
+                _copy_into_place(stored, path)
+                return path
+            except OSError:
+                logging.exception("Failed to copy stored EDOPro database %s; downloading it", name)
+        if time.monotonic() - _failed_at.get(name, -RETRY_SECONDS) >= RETRY_SECONDS:
+            _download_cdb(name, path, stored)
+        if not os.path.exists(path) and stored and os.path.exists(stored):
+            # Couldn't get a fresh one: an old one beats none
+            try:
+                _copy_into_place(stored, path)
+            except OSError:
+                logging.exception("Failed to copy stored EDOPro database %s", name)
+    return path if os.path.exists(path) else ''
+
+
+def _download_cdb(name: str, path: str, stored: str):
+    """Download a database to path, and keep a copy at stored (if given)."""
+    temp = f"{path}.{threading.get_ident()}.part"
     try:
-        if not SAFE_CDB_NAME.fullmatch(name):
-            raise ValueError(f"Unexpected database name {name!r}")
         data = fetch_bytes(EDOPRO_CDB_BASE_URL + name, timeout=60, max_bytes=MAX_CDB_BYTES)
         if not data.startswith(b'SQLite format 3\x00'):
             raise ValueError(f"{name} is not a SQLite database")
-        with open(path, 'wb') as f:
+        # Written beside it and then swapped in, so nobody reads a half-written database
+        with open(temp, 'wb') as f:
             f.write(data)
+        os.replace(temp, path)
+        _failed_at.pop(name, None)
     except Exception:
         logging.exception("Failed to download EDOPro database %s", name)
-    return path if os.path.exists(path) else ''
+        _failed_at[name] = time.monotonic()
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        return
+    if stored:
+        # Not in the background: on Cloud Run a request's CPU is cut back once it has been
+        # answered, which could leave the copy half done
+        try:
+            _copy_into_place(path, stored)
+        except OSError:
+            logging.exception("Failed to store EDOPro database %s", name)
 
 
 def _edopro_token_creator(conn: sqlite3.Connection, token_id: int, token_name: str):

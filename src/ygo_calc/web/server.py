@@ -9,7 +9,7 @@ counts and sends them with each request.
     POST /api/stats                  deck setup -> opening-hand odds
     POST /api/draw                   deck setup -> random hand, next draws, shuffled deck + odds for it
     POST /api/compare                two deck setups -> side-by-side odds
-    GET  /api/cards/{id}/image       card image (cached on disk)
+    GET  /api/cards/{id}/image       card image (cached in memory and on disk)
 
 Security headers, request size limits and rate limits are in security.py. The interactive
 API docs (/api/docs) are only served when YGO_API_DOCS=1.
@@ -23,7 +23,7 @@ import re
 from typing import List, Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ from ..core.deck_parser import DeckParseError
 from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck, load_side_deck
 from ..paths import SRC_DIR
-from .images import SIZES, load_card_image
+from .images import SIZES, ImageUnavailable, get_card_image
 from .security import SecurityMiddleware
 
 # web/dist next to src/, unless YGO_WEB_DIST points elsewhere
@@ -194,18 +194,21 @@ def compare(body: CompareRequest):
 
 
 @app.get("/api/cards/{card_id}/image")
-def card_image(card_id: str, size: Literal["small", "full"] = "small"):
+async def card_image(card_id: str, size: Literal["small", "full"] = "small"):
+    """Async, so images already in memory are sent without waiting for a worker thread (the
+    cache folder and downloads still use threads, inside get_card_image)."""
     if not CARD_ID.fullmatch(card_id) or size not in SIZES:
         raise HTTPException(404)
-    image = load_card_image(card_id, size)
+    try:
+        image = await get_card_image(card_id, size)
+    except ImageUnavailable as e:
+        # Not cached by the browser, so it asks again later
+        raise HTTPException(503, "Card images are unavailable just now.",
+                            headers={"Retry-After": str(max(1, int(e.retry_after)))}) from e
     if image is None:
         raise HTTPException(404)
     # Card art never changes for an ID, so browsers may keep it for a long time
-    headers = {"Cache-Control": "public, max-age=2592000, immutable"}
-    if isinstance(image, bytes):
-        # Just downloaded, and still being saved to the cache
-        return Response(image, media_type="image/jpeg", headers=headers)
-    return FileResponse(image, media_type="image/jpeg", headers=headers)
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000, immutable"})
 
 
 if os.path.isdir(WEB_DIST):

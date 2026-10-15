@@ -100,7 +100,8 @@ docker compose down              # stop (the image cache volume is kept)
 Deploy on Google Cloud Run: the Deploy workflow (`.github/workflows/deploy.yml`) builds the
 image and deploys it whenever CI passes on `main`. The service scales to zero when idle (the
 first visit after a quiet spell takes a few seconds), runs at most one instance (the rate
-limits are per process), and keeps card images in a Cloud Storage bucket mounted at `/cache`.
+limits are per process), and keeps card images and a copy of the EDOPro card databases in a
+Cloud Storage bucket mounted at `/cache`, so neither is downloaded again after a restart.
 At hobby traffic this costs nothing or a few cents a month. One-time setup:
 
 1. Create a project at https://console.cloud.google.com and link a billing account (a card
@@ -118,16 +119,22 @@ can be added with `gcloud beta run domain-mappings create --service ygo-calc --d
 --region europe-west1` plus the DNS records it prints.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
-image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_WEB_DIST` (built front end),
+image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_IMAGE_MEMORY_MB` (recently served
+images kept in memory, default 96), `YGO_WEB_DIST` (built front end),
 `YGO_API_DOCS=1` (serve the interactive API docs at /api/docs; off by default).
 Put it behind a reverse proxy such as Caddy or nginx for HTTPS.
 
 Security (src/ygo_calc/web/security.py): every response carries security headers (a strict
 Content-Security-Policy, no framing, no MIME sniffing), request bodies are limited to 64 KB,
 and each client is rate limited per minute (30 deck lookups, 600 card images, 300 other API
-calls). Behind a reverse proxy or hosting platform, set `FORWARDED_ALLOW_IPS` to the proxy's
-address (or `*` when only the platform can reach the app) so the limits apply to each real
-visitor rather than to the proxy. The Docker image runs as an unprivileged user.
+calls); a client that carries on at twice its limit is blocked for 10 minutes. Behind a reverse
+proxy or hosting platform, set `YGO_PROXY_HOPS` to the number of proxies in front of the app (the
+Cloud Run deploy sets 1) so the limits apply to each real visitor rather than to the proxy; the
+app then reads the address the proxy appended to X-Forwarded-For, which visitors can't fake.
+Requests to the card sites are throttled whoever asks for them (at most 10 a second and 300 a
+minute per site, 4 at a time), a site that answers 429 or keeps failing is left alone for a
+while, and card IDs no source knows aren't looked up again for 30 minutes, so the server can't
+get its address blocked by YGOPRODeck. The Docker image runs as an unprivileged user.
 
 Notes
 

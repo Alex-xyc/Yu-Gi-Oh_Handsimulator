@@ -4,7 +4,7 @@
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { api, DrawResult, Stats } from "../api";
+import { api, DrawResult, prefetchCardImages, Stats } from "../api";
 import { exportStats } from "../export";
 import { DeckSetup } from "../useDeckSetup";
 import { Overlay, SectionHeader, Spinner } from "./common";
@@ -41,6 +41,15 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
 
   // A new deck clears the old hand
   useEffect(() => { setDraw(null); }, [setup.cards]);
+
+  // The test hand shows full-size images and the decklist small ones: once the decklist's have had
+  // a head start, load the main deck's full-size images in the background, so a drawn hand shows at once
+  useEffect(() => {
+    if (!active || !setup.cards) return;
+    const ids = setup.cards.map((card) => card.id);
+    const timer = setTimeout(() => prefetchCardImages(ids, "full"), 1500);
+    return () => clearTimeout(timer);
+  }, [active, setup.cards]);
 
   // Keep the statistics in step with the labels (debounced while clicking through cards)
   const body = setup.body("Deck");

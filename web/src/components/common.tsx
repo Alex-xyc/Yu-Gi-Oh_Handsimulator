@@ -7,7 +7,9 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cardImageUrl, percent, percentDigits } from "../api";
+import { cardImageUrl, loadedImages, percent, percentDigits } from "../api";
+
+const IMAGE_RETRY_MS = 30_000;
 
 /** A card picture, or its name on a plain tile when there's no image. */
 export function CardImage({ id, name, size = "small", className = "" }: {
@@ -15,15 +17,23 @@ export function CardImage({ id, name, size = "small", className = "" }: {
 }) {
   const url = cardImageUrl(id, size);
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => { setFailed(false); setLoaded(false); }, [url]);
+  const [attempt, setAttempt] = useState(0);
+  // An image loaded before (e.g. in another view, or prefetched) shows straight away, without the fade
+  const [loaded, setLoaded] = useState(() => url !== null && loadedImages.has(url));
+  useEffect(() => { setFailed(false); setAttempt(0); setLoaded(url !== null && loadedImages.has(url)); }, [url]);
+  // The server may be holding off the image sites for a moment (it answers 503): try once more later
+  useEffect(() => {
+    if (!failed || attempt > 0) return;
+    const timer = setTimeout(() => { setAttempt(1); setFailed(false); }, IMAGE_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [failed, attempt]);
 
   return (
     <div className={`card-image ${className}`}>
       {url && !failed ? (
-        <img src={url} alt={name} draggable={false} loading="lazy"
+        <img key={attempt} src={url} alt={name} draggable={false} loading="lazy"
              className={loaded ? "loaded" : ""}
-             onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+             onLoad={() => { loadedImages.add(url); setLoaded(true); }} onError={() => setFailed(true)} />
       ) : null}
       {(!url || failed || !loaded) && <span className="card-image-name">{name}</span>}
     </div>

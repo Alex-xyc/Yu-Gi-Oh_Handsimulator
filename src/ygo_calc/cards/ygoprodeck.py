@@ -2,7 +2,8 @@
 
 import html
 import logging
-from typing import Dict, List
+import urllib.error
+from typing import Dict, List, Tuple
 
 from . import cache
 from .edopro import fetch_edopro_card_names
@@ -58,7 +59,7 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
     """Fetch multiple card names from API."""
     result = {}
 
-    uncached_ids = [cid for cid in card_ids if cid not in cache.names]
+    uncached_ids = [cid for cid in card_ids if cid not in cache.names and not cache.recently_unknown(cid)]
 
     for cid in card_ids:
         if cid in cache.names:
@@ -72,15 +73,11 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
     if verbose:
         print(f"Fetching {len(uncached_ids)} card names from API...")
 
-    try:
-        data = fetch_json(CARDINFO_URL.format(ids=",".join(uncached_ids)), timeout=20)
-        if 'data' in data:
-            for card in data['data']:
-                result[str(card['id'])] = _remember_card(card)
-            if verbose:
-                print(f"  Loaded {len(data['data'])} cards.")
-    except Exception:
-        logging.exception("Failed to fetch multiple card names from API")
+    found, answered = _lookup(uncached_ids)
+    for card in found:
+        result[str(card['id'])] = _remember_card(card)
+    if verbose and answered:
+        print(f"  Loaded {len(found)} cards.")
 
     # Fall back to EDOPro for anything YGOPRODeck didn't return
     missing = [cid for cid in uncached_ids if cid not in result]
@@ -88,6 +85,8 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
         if verbose:
             print(f"Looking up {len(missing)} card(s) in EDOPro database...")
         result.update(fetch_edopro_card_names(missing))
+        if answered:
+            cache.remember_unknown([cid for cid in missing if cid not in result])
 
         # IDs EDOPro resolved to another card: use that card's YGOPRODeck name and image
         aliased = {cid: cache.aliases[cid] for cid in missing if cid in cache.aliases}
@@ -109,16 +108,31 @@ def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
 
     Unknown cards get kind "".
     """
-    missing = [cid for cid in card_ids if cid not in cache.info and cid.isdigit()]
+    missing = [cid for cid in card_ids if cid not in cache.info and cid.isdigit() and not cache.recently_unknown(cid)]
     if missing:
-        try:
-            data = fetch_json(CARDINFO_URL.format(ids=",".join(missing)), timeout=20)
-            for card in data.get('data', []):
-                _remember_card(card)
-        except Exception:
-            logging.exception("Failed to fetch card info from API")
+        found, answered = _lookup(missing)
+        for card in found:
+            _remember_card(card)
         # EDOPro for anything YGOPRODeck didn't return (it caches the kind as it goes)
         still_missing = [cid for cid in missing if cid not in cache.info]
         if still_missing:
             fetch_edopro_card_names(still_missing)
+            if answered:
+                cache.remember_unknown([cid for cid in still_missing if cid not in cache.info])
     return {cid: cache.info.get(cid, {"kind": "", "level": 0}) for cid in card_ids}
+
+
+def _lookup(card_ids: List[str]) -> Tuple[List[dict], bool]:
+    """YGOPRODeck's entries for these IDs, and whether it answered (if it couldn't be reached,
+    the cards it didn't return may still exist)."""
+    try:
+        data = fetch_json(CARDINFO_URL.format(ids=",".join(card_ids)), timeout=20)
+        return list(data.get('data', [])), True
+    except urllib.error.HTTPError as e:
+        # It answers 400 when none of the IDs is a card it knows
+        if e.code == 400:
+            return [], True
+        logging.exception("Failed to look up cards on YGOPRODeck")
+    except Exception:
+        logging.exception("Failed to look up cards on YGOPRODeck")
+    return [], False
