@@ -65,7 +65,11 @@ jobs:
       # Scales to zero when idle and wakes on the next request. One instance at most: the rate
       # limits are counted in that process's memory. Card images are cached in the Cloud Storage
       # bucket mounted at /cache (owned by the image's app user, uid 10001). The EDOPro SQLite
-      # databases stay in the container's own /tmp instead, as the bucket mount has no file locking.
+      # databases are used from the container's own /tmp, as the bucket mount has no file locking;
+      # a copy is kept in the bucket (/cache/edopro), so a restarted instance copies them from there
+      # instead of downloading them from GitHub again.
+      # YGO_PROXY_HOPS=1: Cloud Run's front end is the one proxy in front of the app, so the rate
+      # limits go by the address it appends to X-Forwarded-For (see web/security.py).
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ygo-calc \
@@ -78,5 +82,5 @@ jobs:
             --execution-environment gen2 \
             --add-volume "name=cache,type=cloud-storage,bucket=$PROJECT_ID-ygo-cache,mount-options=uid=10001;gid=10001" \
             --add-volume-mount "volume=cache,mount-path=/cache" \
-            --set-env-vars "LOCALAPPDATA=/tmp" \
+            --set-env-vars "LOCALAPPDATA=/tmp,YGO_PROXY_HOPS=1" \
             --allow-unauthenticated

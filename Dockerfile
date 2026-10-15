@@ -26,9 +26,10 @@ RUN groupadd --system --gid 10001 app \
     && mkdir -p /cache && chown app:app /cache
 USER app
 ENV YGO_CACHE_DIR=/cache LOCALAPPDATA=/cache HOST=0.0.0.0 PORT=8000 PYTHONDONTWRITEBYTECODE=1
-# Hosting platforms and reverse proxies sit in front of the container: take each visitor's real
-# address from X-Forwarded-For, so the rate limits are per visitor. (Only exposing the container
-# directly to the internet makes this spoofable; set it to the proxy's address there instead.)
-ENV FORWARDED_ALLOW_IPS=*
+# Behind a hosting platform or reverse proxy, set YGO_PROXY_HOPS to the number of proxies (1 on
+# Cloud Run, see deploy.yml) so the rate limits are per visitor: the app then takes the address
+# the proxy appended to X-Forwarded-For. (Not uvicorn's FORWARDED_ALLOW_IPS=*: that takes the
+# leftmost address, which the visitor sends themselves and can set to anything.) Unset, the
+# connecting address is used, which is right when the container is reached directly.
 EXPOSE 8000
 CMD ["python", "src/web.py"]
