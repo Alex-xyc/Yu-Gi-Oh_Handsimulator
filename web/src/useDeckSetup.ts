@@ -1,9 +1,10 @@
-// One deck and the label (engine / non-engine / brick) of each card copy, set in the decklist view,
+// One deck and the label (engine / engine requirement / non-engine / brick) of each card copy, set in the decklist view,
 // plus its side deck, whose cards can be swapped with the main deck's. Every copy keeps its label
 // and which deck it started in as it moves between the two.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, Category, DeckCard, DeckSetupBody } from "./api";
+import { rememberStatuses } from "./banStatus";
 import { SavedDeck } from "./storage";
 
 /** The most copies of a card a deck can have */
@@ -151,6 +152,7 @@ export function useDeckSetup(initial?: SavedDeck): DeckSetup {
     try {
       const deck = await api.loadDeck(code);
       const deckSide = deck.side ?? [];
+      rememberStatuses([...deck.cards, ...deckSide]);
       setDecks({
         cards: deck.cards, tags: unlabelled(deck.cards), sided: unmoved(deck.cards),
         side: deckSide, sideTags: unlabelled(deckSide), sideFromMain: unmoved(deckSide),

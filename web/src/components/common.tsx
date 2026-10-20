@@ -7,9 +7,45 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cardImageUrl, loadedImages, percent, percentDigits } from "../api";
+import { BanStatus, cardImageUrl, loadedImages, percent, percentDigits } from "../api";
+import { useBanStatus } from "../banStatus";
 
 const IMAGE_RETRY_MS = 30_000;
+
+const BAN_LABELS: Record<Exclude<BanStatus, "">, string> = {
+  banned: "Forbidden in the TCG",
+  limited: "Limited (1 copy) in the TCG",
+  semi_limited: "Semi-Limited (2 copies) in the TCG",
+  ocg: "OCG only: not out in the TCG yet",
+};
+
+/** The banlist icon in a card's top right corner: a red ring on black (struck through when
+ *  forbidden, else a yellow 1 or 2), or a red-framed "OCG" for a card not out in the TCG yet */
+function BanMark({ id }: { id?: string }) {
+  const status = useBanStatus(id);
+  if (!status) return null;
+  const label = BAN_LABELS[status];
+  const digit = { limited: "1", semi_limited: "2" }[status as string];
+  return (
+    <span className={`ban-mark ${status === "ocg" ? "ocg" : ""}`} role="img" aria-label={label} title={label}>
+      {status === "ocg" ? (
+        <svg viewBox="0 0 44 24" aria-hidden="true">
+          <rect x="1.75" y="1.75" width="40.5" height="20.5" rx="4" className="ban-face" />
+          <text x="22" y="13" className="ban-text" fontSize="13.5">OCG</text>
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10.1" className="ban-face" />
+          {digit ? (
+            <text x="12" y="13" className="ban-text" fontSize="15">{digit}</text>
+          ) : (
+            <line x1="5.4" y1="5.4" x2="18.6" y2="18.6" className="ban-slash" />
+          )}
+        </svg>
+      )}
+    </span>
+  );
+}
 
 /** A card picture, or its name on a plain tile when there's no image. */
 export function CardImage({ id, name, size = "small", className = "" }: {
@@ -36,6 +72,7 @@ export function CardImage({ id, name, size = "small", className = "" }: {
              onLoad={() => { loadedImages.add(url); setLoaded(true); }} onError={() => setFailed(true)} />
       ) : null}
       {(!url || failed || !loaded) && <span className="card-image-name">{name}</span>}
+      <BanMark id={id} />
     </div>
   );
 }
@@ -143,7 +180,7 @@ export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
 export interface SegmentOption<T> {
   value: T;
   label: ReactNode;
-  /** Colours the pill: a tag (engine, non_engine, brick); the accent otherwise */
+  /** Colours the pill: a tag (engine, requirement, non_engine, brick); the accent otherwise */
   tone?: string;
 }
 
@@ -239,7 +276,7 @@ export function Bar({ value, tone }: { value: number; tone: string }) {
 }
 
 /** A colour of a label or deck, as used by the tone-* classes */
-export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
+export type Tone = "engine" | "requirement" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
 
 /** The tone of a deck in the comparison: side 0 is deck A (blue), side 1 deck B (pink) */
 export const deckTone = (side: number): Tone => (side ? "deck-b" : "deck-a");

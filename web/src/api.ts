@@ -1,14 +1,25 @@
 // Types and calls for the Python API (src/ygo_calc/web/server.py)
 
-export type Category = "brick" | "non_engine" | "engine" | "";
-export const CATEGORIES = ["engine", "non_engine", "brick"] as const;
+/** "requirement": an engine requirement, a card that isn't a starter but is needed alongside one
+ *  for the combo, or is half of a two-card combo */
+export type Category = "brick" | "non_engine" | "engine" | "requirement" | "";
+export const CATEGORIES = ["engine", "requirement", "non_engine", "brick"] as const;
 export type TagKey = (typeof CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<TagKey, string> = {
   engine: "Engine",
+  requirement: "Engine Req.",
   non_engine: "Non-Engine",
   brick: "Brick",
 };
+
+/** The categories to show odds for: engine requirements only when the deck has some */
+export const shownCategories = (counts: Record<TagKey, number>): TagKey[] =>
+  CATEGORIES.filter((key) => key !== "requirement" || counts[key] > 0);
+
+/** A card's TCG banlist status: "ocg" when it's out in the OCG but not the TCG yet, "" when unlimited
+ *  (or not known) */
+export type BanStatus = "banned" | "limited" | "semi_limited" | "ocg" | "";
 
 export interface DeckCard {
   name: string;
@@ -19,12 +30,15 @@ export interface DeckCard {
   kind?: string;
   /** A monster's level */
   level?: number;
+  /** As of when the deck was loaded (useBanStatus has the current one) */
+  status?: BanStatus;
 }
 
 export interface Counts {
   brick: number;
   non_engine: number;
   engine: number;
+  requirement: number;
 }
 
 export interface DeckSetupBody {
@@ -132,8 +146,10 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 export const api = {
   /** The main deck and the side deck (empty if it has none) */
   loadDeck: (code: string) => post<{ cards: DeckCard[]; side: DeckCard[]; size: number }>("/api/decks", { code }),
-  /** Each card's kind and level by ID, for decks saved before the card list had them */
-  cardInfo: (ids: string[]) => post<Record<string, { kind: string; level: number }>>("/api/decks/info", { ids }),
+  /** Each card's kind, level and banlist status by ID (for decks saved before the card list had
+   *  them, and the current status) */
+  cardInfo: (ids: string[]) =>
+    post<Record<string, { kind: string; level: number; status?: BanStatus }>>("/api/decks/info", { ids }),
   /** handSize 6 gives the odds going second */
   stats: (deck: DeckSetupBody, signal?: AbortSignal, handSize = 5) =>
     post<Stats>(`/api/stats?hand_size=${handSize}`, deck, signal),

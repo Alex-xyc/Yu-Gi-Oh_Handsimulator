@@ -26,7 +26,7 @@ const HAND_SIZES = [
 
 /** Whether more of a composition/average row is good (true), bad (false) or neither (null) */
 const MORE_IS_BETTER: Record<string, boolean | null> = {
-  "Deck size": false, "Engine": true, "Non-Engine": true, "Bricks": false, "Untagged": null,
+  "Deck size": false, "Engine": true, "Engine Req.": null, "Non-Engine": true, "Bricks": false, "Untagged": null,
 };
 
 /** The table name for each deck: its tab's name; never the same twice */

@@ -23,21 +23,25 @@ MAX_CDB_BYTES = 200 * 1024 * 1024
 EDOPRO_CACHE_MAX_AGE = 7 * 24 * 60 * 60  # Re-download CDBs weekly
 EDOPRO_TYPE_TOKEN = 0x4000
 EDOPRO_TYPE_MONSTER, EDOPRO_TYPE_SPELL, EDOPRO_TYPE_TRAP = 0x1, 0x2, 0x4
+# Which regions a card is out in ("ot")
+EDOPRO_OT_OCG, EDOPRO_OT_TCG = 0x1, 0x2
 # Spell / trap subtype bits
 EDOPRO_SUBTYPES = ((0x10000, "quick_play"), (0x20000, "continuous"), (0x40000, "equip"),
                    (0x80000, "field"), (0x80, "ritual"), (0x100000, "counter"))
 
 
-def _edopro_info(card_type: int, level: int) -> dict:
-    """A card's kind (monster, spell_<subtype>, trap_<subtype>) and level from its EDOPro type bits."""
+def _edopro_info(card_type: int, level: int, ot: int = 0) -> dict:
+    """A card's kind (monster, spell_<subtype>, trap_<subtype>), level and status ("ocg" if it's
+    out in the OCG but not the TCG, else "": EDOPro doesn't know the banlist) from its EDOPro data."""
+    status = "ocg" if ot & EDOPRO_OT_OCG and not ot & EDOPRO_OT_TCG else ""
     if card_type & (EDOPRO_TYPE_SPELL | EDOPRO_TYPE_TRAP):
         base = "spell" if card_type & EDOPRO_TYPE_SPELL else "trap"
         subtype = next((name for bit, name in EDOPRO_SUBTYPES if card_type & bit), "normal")
-        return {"kind": f"{base}_{subtype}", "level": 0}
+        return {"kind": f"{base}_{subtype}", "level": 0, "status": status}
     if card_type & EDOPRO_TYPE_MONSTER:
         # The low byte is the level; the rest holds the pendulum scales
-        return {"kind": "monster", "level": level & 0xff}
-    return {"kind": "", "level": 0}
+        return {"kind": "monster", "level": level & 0xff, "status": status}
+    return {"kind": "", "level": 0, "status": status}
 
 
 def _edopro_cache_dir() -> str:
@@ -212,13 +216,13 @@ def fetch_edopro_card_names(card_ids: List[str]) -> Dict[str, str]:
             try:
                 placeholders = ",".join("?" * len(missing))
                 rows = conn.execute(
-                    "SELECT t.id, t.name, d.type, d.level FROM texts t JOIN datas d ON d.id = t.id "
+                    "SELECT t.id, t.name, d.type, d.level, d.ot FROM texts t JOIN datas d ON d.id = t.id "
                     f"WHERE t.id IN ({placeholders})",
                     [int(cid) for cid in missing]
                 ).fetchall()
                 rows = [(cid, cname, _edopro_token_creator(conn, cid, cname) if ctype & EDOPRO_TYPE_TOKEN else None,
-                         _edopro_info(ctype, clevel))
-                        for cid, cname, ctype, clevel in rows]
+                         _edopro_info(ctype, clevel, cot))
+                        for cid, cname, ctype, clevel, cot in rows]
             finally:
                 conn.close()
         except Exception:

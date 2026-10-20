@@ -2,9 +2,9 @@
 
 from typing import Dict, List, NamedTuple, Optional
 
-from .categories import BRICK, ENGINE, NON_ENGINE, CardPool, count_categories
+from .categories import BRICK, ENGINE, NON_ENGINE, REQUIREMENT, CardPool, count_categories
 from .probability import probability_at_least
-from .stats import HAND_ODDS, HandOdds, opening_stats, pool_hand_odds  # noqa: F401 (HandOdds re-exported)  # pylint: disable=unused-import
+from .stats import HAND_ODDS, HandOdds, opening_stats, pool_hand_odds, shown_hand_odds  # noqa: F401 (HandOdds re-exported)  # pylint: disable=unused-import
 
 LABEL_W = 30
 COL_W = 10
@@ -30,6 +30,13 @@ class DeckSummary(NamedTuple):
 def hand_odds(deck: DeckSummary, hand_size: int) -> List[float]:
     """Chance of each HAND_ODDS entry, in that order."""
     return pool_hand_odds(deck.pool, hand_size)
+
+
+def _categories(counts_1: Dict[str, int], counts_2: Dict[str, int]):
+    """(key, label) of each category to list; engine requirements only when either deck has some."""
+    listed = [(ENGINE, "Engine"), (REQUIREMENT, "Engine Req."), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")]
+    return [(key, label) for key, label in listed
+            if key != REQUIREMENT or counts_1[key] or counts_2[key]]
 
 
 def _better(diff: float, higher_is_better: Optional[bool], deck_1: str, deck_2: str) -> str:
@@ -75,7 +82,7 @@ def format_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int =
     # Composition
     out.append("\nComposition:\n")
     out.append(_count_row("Deck size", deck_1.size, deck_2.size))
-    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+    for key, label in _categories(counts_1, counts_2):
         out.append(_count_row(label, counts_1[key], counts_2[key]))
     untagged_1 = deck_1.size - sum(counts_1.values())
     untagged_2 = deck_2.size - sum(counts_2.values())
@@ -85,12 +92,14 @@ def format_comparison(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int =
     # Opening hand odds
     out.append("\n" + "-" * width + "\n")
     out.append("Opening hand:\n")
-    for odds, p_1, p_2 in zip(HAND_ODDS, hand_odds(deck_1, hand_size), hand_odds(deck_2, hand_size)):
-        out.append(_percent_row(odds.label, p_1, p_2, odds.higher_is_better, n1, n2))
+    for odds, p_1, p_2, shown in zip(HAND_ODDS, hand_odds(deck_1, hand_size), hand_odds(deck_2, hand_size),
+                                     shown_hand_odds(deck_1.pool, deck_2.pool)):
+        if shown:
+            out.append(_percent_row(odds.label, p_1, p_2, odds.higher_is_better, n1, n2))
 
     # Average cards per hand
     out.append("\nAverage per hand:\n")
-    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+    for key, label in _categories(counts_1, counts_2):
         avg_1 = hand_size * counts_1[key] / deck_1.size if deck_1.size else 0.0
         avg_2 = hand_size * counts_2[key] / deck_2.size if deck_2.size else 0.0
         diff = avg_2 - avg_1
@@ -145,7 +154,7 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
     """
     counts_1, counts_2 = count_categories(deck_1.pool), count_categories(deck_2.pool)
     composition = [{"label": "Deck size", "a": deck_1.size, "b": deck_2.size}]
-    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+    for key, label in _categories(counts_1, counts_2):
         composition.append({"label": label, "a": counts_1[key], "b": counts_2[key]})
     untagged_1 = deck_1.size - sum(counts_1.values())
     untagged_2 = deck_2.size - sum(counts_2.values())
@@ -158,12 +167,14 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
         return 2 if (diff > 0) == higher_is_better else 1
 
     odds = []
-    for entry, p_1, p_2 in zip(HAND_ODDS, hand_odds(deck_1, hand_size), hand_odds(deck_2, hand_size)):
-        odds.append({"label": entry.label, "a": p_1, "b": p_2,
-                     "better": better(p_2 - p_1, entry.higher_is_better)})
+    for entry, p_1, p_2, shown in zip(HAND_ODDS, hand_odds(deck_1, hand_size), hand_odds(deck_2, hand_size),
+                                      shown_hand_odds(deck_1.pool, deck_2.pool)):
+        if shown:
+            odds.append({"label": entry.label, "a": p_1, "b": p_2,
+                         "better": better(p_2 - p_1, entry.higher_is_better)})
 
     averages = []
-    for key, label in ((ENGINE, "Engine"), (NON_ENGINE, "Non-Engine"), (BRICK, "Bricks")):
+    for key, label in _categories(counts_1, counts_2):
         averages.append({
             "label": label,
             "a": hand_size * counts_1[key] / deck_1.size if deck_1.size else 0.0,
@@ -177,12 +188,12 @@ def compare_decks(deck_1: DeckSummary, deck_2: DeckSummary, hand_size: int = 5) 
     def pair(label: str, p_1: float, p_2: float, higher_is_better: bool) -> Dict:
         return {"label": label, "a": p_1, "b": p_2, "better": better(p_2 - p_1, higher_is_better)}
 
-    # More engine and non-engine is better, more bricks is worse
+    # More engine, engine requirements and non-engine is better, more bricks is worse
+    nouns = {ENGINE: "engine", REQUIREMENT: "engine req.", NON_ENGINE: "non-engine", BRICK: "brick"}
     at_least = []
-    for key, label, noun in ((ENGINE, "Engine", "engine"), (NON_ENGINE, "Non-Engine", "non-engine"),
-                             (BRICK, "Brick", "brick")):
-        at_least.append({"key": key, "label": label, "rows": [
-            pair(f"At least {k} {noun}", p_1, p_2, key != BRICK)
+    for key, label in _categories(counts_1, counts_2):
+        at_least.append({"key": key, "label": "Brick" if key == BRICK else label, "rows": [
+            pair(f"At least {k} {nouns[key]}", p_1, p_2, key != BRICK)
             for k, (p_1, p_2) in enumerate(zip(stats_1["at_least"][key], stats_2["at_least"][key]), 1)
         ]})
 

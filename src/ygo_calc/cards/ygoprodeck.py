@@ -9,20 +9,38 @@ from . import cache
 from .edopro import fetch_edopro_card_names
 from .http import fetch_json
 
-CARDINFO_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids}"
+# misc=yes adds each card's formats (TCG / OCG / …), to tell OCG-only cards apart
+CARDINFO_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids}&misc=yes"
 # A spell or trap card's "race" -> its subtype
 SUBTYPES = {"Normal": "normal", "Quick-Play": "quick_play", "Continuous": "continuous", "Field": "field",
             "Equip": "equip", "Ritual": "ritual", "Counter": "counter"}
+# A card's TCG banlist entry -> its status
+BANLIST = {"Forbidden": "banned", "Banned": "banned", "Limited": "limited", "Semi-Limited": "semi_limited"}
+
+
+def card_status(card: dict) -> str:
+    """A YGOPRODeck card entry's TCG status: "banned", "limited", "semi_limited", "ocg" (not out in
+    the TCG yet) or "" (unlimited)."""
+    status = BANLIST.get((card.get('banlist_info') or {}).get('ban_tcg', ''), '')
+    if status:
+        return status
+    misc = card.get('misc_info') or [{}]
+    formats = misc[0].get('formats') or []
+    if 'OCG' in formats and 'TCG' not in formats:
+        return "ocg"
+    return ""
 
 
 def card_info(card: dict) -> dict:
-    """A YGOPRODeck card entry's kind (monster, spell_<subtype>, trap_<subtype>) and level."""
+    """A YGOPRODeck card entry's kind (monster, spell_<subtype>, trap_<subtype>), level and
+    status (see card_status)."""
     frame = card.get('frameType', '')
+    status = card_status(card)
     if frame in ('spell', 'trap'):
-        return {"kind": f"{frame}_{SUBTYPES.get(card.get('race', ''), 'normal')}", "level": 0}
+        return {"kind": f"{frame}_{SUBTYPES.get(card.get('race', ''), 'normal')}", "level": 0, "status": status}
     if 'Monster' in card.get('type', ''):
-        return {"kind": "monster", "level": int(card.get('level') or 0)}
-    return {"kind": "", "level": 0}
+        return {"kind": "monster", "level": int(card.get('level') or 0), "status": status}
+    return {"kind": "", "level": 0, "status": status}
 
 
 def _remember_card(card: dict) -> str:
@@ -104,7 +122,7 @@ def fetch_multiple_card_names(card_ids: List[str], verbose: bool = True) -> Dict
 
 
 def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
-    """Each card's kind and level (see card_info), looking up the ones not cached yet.
+    """Each card's kind, level and status (see card_info), looking up the ones not cached yet.
 
     Unknown cards get kind "".
     """
@@ -119,7 +137,7 @@ def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
             fetch_edopro_card_names(still_missing)
             if answered:
                 cache.remember_unknown([cid for cid in still_missing if cid not in cache.info])
-    return {cid: cache.info.get(cid, {"kind": "", "level": 0}) for cid in card_ids}
+    return {cid: cache.info.get(cid, {"kind": "", "level": 0, "status": ""}) for cid in card_ids}
 
 
 def _lookup(card_ids: List[str]) -> Tuple[List[dict], bool]:

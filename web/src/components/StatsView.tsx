@@ -2,11 +2,12 @@
 
 import { motion } from "framer-motion";
 import { memo } from "react";
-import { CardOdds, CATEGORIES, CATEGORY_LABELS, percent, percentWidth, Stats } from "../api";
+import { CardOdds, CATEGORY_LABELS, percent, percentWidth, shownCategories, Stats } from "../api";
 import { AnimatedPercent, Bar, Dot, SectionHeader, StatTile } from "./common";
 
 const GROUPS: { key: CardOdds["group"]; title: string }[] = [
   { key: "engine", title: "Engine" },
+  { key: "requirement", title: "Engine Req." },
   { key: "non_engine", title: "Non-Engine" },
   { key: "brick", title: "Brick" },
   { key: "mixed", title: "Mixed tags" },
@@ -86,7 +87,8 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
   }
   const maxCell = Math.max(...stats.matrix.flat().map((p) => p ?? 0), 0.0001);
   // The value column fits the longest number, so every row's bar lines up
-  const valueWidth = percentWidth(CATEGORIES.flatMap((key) => stats.at_least[key]));
+  const categories = shownCategories(stats.counts);
+  const valueWidth = percentWidth(categories.flatMap((key) => stats.at_least[key]));
   const grouped = tagged;
 
   // Opening at least 1 .. 5 of the cards sided in, going first and second
@@ -105,13 +107,13 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
     <div className="stats">
       <div className="stat-tiles">
         <StatTile value={stats.deck_size} label="cards" />
-        {CATEGORIES.map((key) => <StatTile key={key} value={stats.counts[key]} label={CATEGORY_LABELS[key]} tone={key} />)}
+        {categories.map((key) => <StatTile key={key} value={stats.counts[key]} label={CATEGORY_LABELS[key]} tone={key} />)}
         {stats.counts.untagged > 0 && <StatTile value={stats.counts.untagged} label="Untagged" />}
       </div>
 
       <Section title="Opening hand" hint="(chance of drawing X or more)">
         <div className="odds-groups" style={{ ["--value-ch" as string]: valueWidth }}>
-          {CATEGORIES.map((key) => (
+          {categories.map((key) => (
             <div key={key} className="odds-rows">
               {stats.at_least[key].map((p, i) => (
                 <div key={i} className="odds-row">
@@ -199,7 +201,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
       <Section title="6th card" hint="(based on the current hand)">
         {(stats.sixth_card || sideSixth) && (
           <div className="odds-rows">
-            {stats.sixth_card && CATEGORIES.map((key) => (
+            {stats.sixth_card && categories.map((key) => (
               <div key={key} className="odds-row">
                 <span>{CATEGORY_LABELS[key]} <span className="muted small">({stats.sixth_card![key].remaining}/{stats.sixth_card!.deck_remaining})</span></span>
                 <Bar value={stats.sixth_card![key].probability} tone={key} />
