@@ -4,8 +4,8 @@ The server keeps no per-user state: the browser holds the deck and its tags or
 counts and sends them with each request.
 
     POST /api/decks                  deck code -> main and side deck card lists
-    POST /api/decks/info             card IDs -> each card's kind and level (for decks saved before
-                                     the card list had them)
+    POST /api/decks/info             card IDs -> each card's kind, level and banlist status (for
+                                     decks saved before the card list had them, and a fresh status)
     POST /api/stats                  deck setup -> opening-hand odds
     POST /api/draw                   deck setup -> random hand, next draws, shuffled deck + odds for it
     POST /api/compare                two deck setups -> side-by-side odds
@@ -60,13 +60,14 @@ class Counts(BaseModel):
     brick: int = Field(0, ge=0)
     non_engine: int = Field(0, ge=0)
     engine: int = Field(0, ge=0)
+    requirement: int = Field(0, ge=0)
 
 
 class DeckSetup(BaseModel):
     """A deck plus its categories: per-copy tags (from the decklist view) or typed counts."""
     name: str = Field("Deck", max_length=40)
     cards: List[Card] = Field(min_length=1, max_length=YuGiOhDeck.MAX_DECK_SIZE)
-    tags: Optional[List[Literal["brick", "non_engine", "engine", ""]]] = None
+    tags: Optional[List[Literal["brick", "non_engine", "engine", "requirement", ""]]] = None
     counts: Optional[Counts] = None
     # Per copy, in deck order: whether it was swapped in from the side deck (the draw marks those cards)
     sided: Optional[List[bool]] = Field(None, max_length=YuGiOhDeck.MAX_DECK_SIZE)
@@ -94,10 +95,10 @@ class DeckSetup(BaseModel):
                 raise HTTPException(400, "Tags don't match the deck.")
             return pool_from_tags(deck, list(self.tags))
         counts = self.counts or Counts()
-        total = counts.brick + counts.non_engine + counts.engine
+        total = counts.brick + counts.non_engine + counts.engine + counts.requirement
         if total > size:
             raise HTTPException(400, f"{self.name}: total counts ({total}) exceed deck size ({size}).")
-        return pool_from_counts(deck, counts.brick, counts.non_engine, counts.engine)
+        return pool_from_counts(deck, counts.brick, counts.non_engine, counts.engine, counts.requirement)
 
 
 class DrawRequest(BaseModel):
@@ -126,7 +127,8 @@ CARD_ID = re.compile(r"[0-9]{1,10}")
 def load_deck(body: DeckCode):
     """Look up a ydke:// code or .ydk file text; returns the main and side decks in deck order,
     with each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for
-    sorting."""
+    sorting, and its TCG status (banned, limited, semi_limited, ocg for not out in the TCG yet, or
+    "")."""
     deck = YuGiOhDeck()
     try:
         card_ids = load_main_deck(deck, body.code)
@@ -149,7 +151,8 @@ class CardIds(BaseModel):
 
 @app.post("/api/decks/info")
 def card_infos(body: CardIds):
-    """Each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level."""
+    """Each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown), level and TCG
+    status (banned, limited, semi_limited, ocg or "")."""
     ids = [cid for cid in dict.fromkeys(body.ids) if CARD_ID.fullmatch(cid)]
     return fetch_card_infos(ids)
 

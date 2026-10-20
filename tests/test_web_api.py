@@ -14,9 +14,9 @@ try:
 except ImportError:  # The web dependencies are optional (requirements-web.txt)
     TestClient = None
 
-from ygo_calc.core.categories import BRICK, ENGINE, NON_ENGINE
+from ygo_calc.core.categories import BRICK, ENGINE, NON_ENGINE, REQUIREMENT
 from ygo_calc.core.stats import opening_stats
-from ygo_calc.core.probability import probability_at_least
+from ygo_calc.core.probability import hypergeometric_probability, probability_at_least
 
 YDK = "#main\n" + "\n".join(["100"] * 3 + ["200"] * 2 + [str(300 + i) for i in range(35)]) + "\n#extra\n!side\n"
 
@@ -39,11 +39,35 @@ class TestOpeningStats(unittest.TestCase):
     def test_counts_and_odds(self):
         pool = [("A", ENGINE)] * 12 + [("B", NON_ENGINE)] * 9 + [("C", BRICK)] * 4 + [("D", "")] * 15
         stats = opening_stats(pool)
-        self.assertEqual(stats["counts"], {BRICK: 4, NON_ENGINE: 9, ENGINE: 12, "untagged": 15})
+        self.assertEqual(stats["counts"], {BRICK: 4, NON_ENGINE: 9, ENGINE: 12, REQUIREMENT: 0, "untagged": 15})
         self.assertAlmostEqual(stats["at_least"][ENGINE][0], probability_at_least(40, 12, 5, 1))
         cells = [p for row in stats["matrix"] for p in row if p is not None]
         self.assertAlmostEqual(sum(cells), 1.0)
         self.assertIsNone(stats["sixth_card"])
+
+    def test_engine_requirement_odds(self):
+        pool = [("A", ENGINE)] * 10 + [("R", REQUIREMENT)] * 6 + [("D", "")] * 24
+        stats = opening_stats(pool, hand_categories=[REQUIREMENT, ENGINE, "", "", ""])
+        self.assertEqual(stats["counts"][REQUIREMENT], 6)
+        self.assertAlmostEqual(stats["at_least"][REQUIREMENT][1], probability_at_least(40, 6, 5, 2))
+        self.assertEqual(stats["sixth_card"][REQUIREMENT]["remaining"], 5)
+        combos = {c["label"]: c["probability"] for c in stats["combinations"]}
+        no_engine = hypergeometric_probability(40, 10, 5, 0)
+        no_req = hypergeometric_probability(40, 6, 5, 0)
+        neither = hypergeometric_probability(40, 16, 5, 0)
+        self.assertAlmostEqual(combos["1+ engine & 1+ engine req."], 1 - no_engine - no_req + neither)
+        # No engine and at most one requirement: the 24 others with 0 or 1 of the 6
+        stuck = sum(hypergeometric_probability(40, 6, 5, r) * hypergeometric_probability(34, 10, 5 - r, 0)
+                    for r in (0, 1))
+        self.assertAlmostEqual(combos["1+ engine or 2+ engine req."], 1 - stuck)
+        # Pure at-least rows aren't repeated as combinations
+        self.assertNotIn("At least 1 engine req.", combos)
+        self.assertIn("requirement", {card["group"] for card in stats["cards"]})
+
+    def test_requirement_odds_hidden_without_requirements(self):
+        pool = [("A", ENGINE)] * 12 + [("D", "")] * 28
+        labels = [c["label"] for c in opening_stats(pool)["combinations"]]
+        self.assertFalse(any("req." in label for label in labels))
 
     def test_sixth_card_uses_hand(self):
         pool = [("A", ENGINE)] * 12 + [("D", "")] * 28

@@ -16,6 +16,7 @@ class YuGiOhDeck:
         self.engine_cards: set = set()
         self.non_engine_cards: set = set()
         self.brick_cards: set = set()
+        self.requirement_cards: set = set()
 
     def add_card(self, card_name: str, copies: int) -> None:
         if copies < 1 or copies > self.MAX_COPIES:
@@ -30,6 +31,7 @@ class YuGiOhDeck:
         self.engine_cards.clear()
         self.non_engine_cards.clear()
         self.brick_cards.clear()
+        self.requirement_cards.clear()
 
     def get_deck_list(self) -> List[str]:
         deck = []

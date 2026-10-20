@@ -99,7 +99,9 @@ export default function App() {
                  target="_blank" rel="noopener noreferrer">Source</a>
             </div>
           </div>
-          <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>Compare decks</Button>
+          <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>
+            Compare<span className="max-sm:hidden">&nbsp;decks</span>
+          </Button>
         </header>
 
         {/* Keyed by slot: closing a tab unmounts it, so a reopened slot starts fresh */}

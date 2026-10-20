@@ -1,4 +1,4 @@
-// Siding: the main deck above the side deck, 10 cards per row. Click main deck cards to side them
+// Siding: the main deck above the side deck, 10 cards per row (5 when that makes them bigger, on a phone). Click main deck cards to side them
 // out and side deck cards to side them in; Swap trades them once as many go in as come out, so the
 // main deck keeps its size. The cards are sized so both decks always fit the window, without
 // scrolling (as the shuffled deck).
@@ -9,7 +9,8 @@ import { Category, CATEGORY_LABELS } from "../api";
 import { DeckSetup, MAX_COPIES } from "../useDeckSetup";
 import { CardImage } from "./common";
 
-const COLUMNS = 10;
+// Cards per row: whichever gives the bigger cards
+const COLUMN_CHOICES = [10, 5];
 const GAP = 8; // between cards, both ways (gap-2)
 const HEADING = 28; // a deck's title line (h-7)
 const SECTION_GAP = 14; // between the two decks (gap-3.5)
@@ -24,7 +25,7 @@ const toggled = (set: Set<number>, index: number) => {
   return next;
 };
 
-function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName, cardWidth, onToggle }: {
+function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName, columns, cardWidth, onToggle }: {
   title: string;
   list: string[];
   /** Each copy's label, shown on it */
@@ -36,6 +37,7 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
   picked: Set<number>;
   pick: Pick;
   idByName: Record<string, string>;
+  columns: number;
   cardWidth: number | null;
   onToggle: (index: number) => void;
 }) {
@@ -47,7 +49,7 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
         {picked.size > 0 && <span className={`side-count ${pick}`}>{picked.size} {pick}</span>}
       </h3>
       <ul className="m-0 grid list-none justify-center gap-2" style={{ padding: `${OUTLINE}px 0`,
-          gridTemplateColumns: `repeat(${COLUMNS}, ${cardWidth === null ? "minmax(0, 1fr)" : `${cardWidth}px`})` }}>
+          gridTemplateColumns: `repeat(${columns}, ${cardWidth === null ? "minmax(0, 1fr)" : `${cardWidth}px`})` }}>
         {list.map((name, i) => {
           const isPicked = picked.has(i);
           const tag = tags[i];
@@ -105,18 +107,24 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
 
   // The widest card that lets both decks' rows fit the width and the height of the space left
   const area = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(COLUMN_CHOICES[0]);
   const [cardWidth, setCardWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = area.current;
     if (!el) return;
-    const mainRows = Math.max(1, Math.ceil(deckList.length / COLUMNS));
-    const sideRows = Math.max(1, Math.ceil(sideList.length / COLUMNS));
-    const rows = mainRows + sideRows;
-    const fit = () => {
-      const byWidth = (el.clientWidth - (COLUMNS - 1) * GAP) / COLUMNS;
+    const widthFor = (cols: number) => {
+      const mainRows = Math.max(1, Math.ceil(deckList.length / cols));
+      const sideRows = Math.max(1, Math.ceil(sideList.length / cols));
+      const rows = mainRows + sideRows;
+      const byWidth = (el.clientWidth - (cols - 1) * GAP) / cols;
       const height = el.clientHeight - 2 * HEADING - SECTION_GAP - 4 * OUTLINE - (rows - 2) * GAP;
       const byHeight = (height / rows) * CARD_RATIO;
-      setCardWidth(Math.max(0, Math.floor(Math.min(byWidth, byHeight))));
+      return Math.max(0, Math.floor(Math.min(byWidth, byHeight)));
+    };
+    const fit = () => {
+      const best = COLUMN_CHOICES.reduce((a, b) => (widthFor(b) > widthFor(a) ? b : a));
+      setColumns(best);
+      setCardWidth(widthFor(best));
     };
     fit();
     const observer = new ResizeObserver(fit);
@@ -148,10 +156,10 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
       </div>
       <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
         <DeckGrid title="Main deck" list={deckList} tags={tags} moved={setup.sided} movedLabel="sided in" picked={out} pick="out" idByName={idByName}
-                  cardWidth={cardWidth} onToggle={(i) => setOut(toggled(out, i))} />
+                  columns={columns} cardWidth={cardWidth} onToggle={(i) => setOut(toggled(out, i))} />
         <DeckGrid title="Side deck" list={sideList} tags={setup.sideTags} moved={setup.sideFromMain} movedLabel="sided out"
                   picked={into} pick="in" idByName={idByName}
-                  cardWidth={cardWidth} onToggle={(i) => setInto(toggled(into, i))} />
+                  columns={columns} cardWidth={cardWidth} onToggle={(i) => setInto(toggled(into, i))} />
       </div>
     </div>
   );

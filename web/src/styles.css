@@ -17,6 +17,7 @@
 
 /* Tones: a component's colour (--tone) from a label or deck, e.g. "tone-engine", "tone-deck-a" */
 .tone-engine { --tone: var(--color-engine); }
+.tone-requirement { --tone: var(--color-requirement); }
 .tone-non_engine { --tone: var(--color-non-engine); }
 .tone-brick { --tone: var(--color-brick); }
 .tone-deck-a { --tone: var(--color-deck-a); }
@@ -42,6 +43,11 @@
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
                   margin-bottom: 14px; }
 .section-header > :is(h2, h3) { margin-bottom: 0; }
+/* A deck tab's labelling and test hand share a panel on wide screens; narrower, each is its own panel */
+@media (width < 64rem) {
+  .workspace-part { background: var(--color-panel); border: 1px solid var(--color-line);
+                    border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); padding: 18px 20px; }
+}
 
 /* Deck tabs along the top, like a browser's: each sizes to its name up to a maximum width, all
    shrink when the row is full, and a name that doesn't fit ends in an ellipsis. When even the
@@ -92,6 +98,18 @@
 .card-image-name { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px;
                    text-align: center; font-size: 11px; line-height: 1.3; color: var(--color-muted); }
 .card-back { display: block; width: 100%; height: 100%; }
+/* Banlist status, top right: forbidden / limited / semi-limited, or OCG only. Above a tagged
+   tile's tint, so it keeps its colours */
+.card-image .ban-mark { position: absolute; z-index: 1; top: 4%; right: 5%; width: clamp(14px, 24%, 30px); pointer-events: auto;
+                        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+.card-image .ban-mark.ocg { width: clamp(24px, 40%, 52px); }
+.ban-mark svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ban-face { fill: #0b0b0d; stroke: #e5161d; stroke-width: 3.5; }
+.ban-slash { stroke: #e5161d; stroke-width: 3.5; }
+.ban-text { fill: #ffd21a; stroke: #0b0b0d; stroke-width: 1.2; paint-order: stroke; font-weight: 900; font-family: Inter, system-ui, sans-serif;
+            text-anchor: middle; dominant-baseline: central; }
+/* A picked card's tick (or IN / OUT) takes the corner */
+.tag-tile.selected .ban-mark, .side-tile:is(.out, .in) .ban-mark { opacity: 0; }
 /* A label on a card (test hand and decklist): dark text on the label's colour */
 .card-badge { font-size: 11px; font-weight: 700; color: var(--color-ink); background: var(--tone); white-space: nowrap; }
 .hand-badge { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 0; border-radius: 6px; text-align: center;
@@ -184,7 +202,8 @@ table { border-collapse: collapse; width: 100%; }
 .tag-tile { position: relative; display: block; padding: 0; border: 2px solid transparent; border-radius: 9px; background: none; cursor: pointer;
             transition: border-color 0.2s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth), transform 0.2s var(--ease-smooth),
                         opacity 0.2s; }
-.tag-tile:hover { transform: translateY(-3px); }
+/* Not on touch screens, where a tapped card would stay lifted */
+@media (hover: hover) { .tag-tile:hover { transform: translateY(-3px); } }
 .tag-tile:active { transform: scale(0.96); }
 /* Picked cards (shift-click): a blue frame and tick, over their label colour, which still shows */
 .tag-tile.selected, .tag-tile.tagged.selected { outline: 3px solid var(--color-sixth); outline-offset: 2px;
@@ -221,7 +240,9 @@ table { border-collapse: collapse; width: 100%; }
 /* Siding: cards picked to go out of the main deck (red) or come in from the side deck (green) */
 .side-tile { position: relative; display: block; width: 100%; padding: 0; border: none; border-radius: 7px; background: none;
              cursor: pointer; transition: transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth); }
-.side-tile:hover { transform: translateY(-2px); }
+@media (hover: hover) { .side-tile:hover { transform: translateY(-2px); } }
+/* Dragging and Shift+click need a mouse: no hint about them on touch screens */
+@media (hover: none) { .mouse-hint { display: none; } }
 .side-tile:active { transform: scale(0.96); }
 .side-tile .card-image { border-radius: 7px; transition: opacity 0.2s; }
 .side-tile.out, .side-count.out { --pick: var(--color-danger); }
@@ -270,6 +291,8 @@ table { border-collapse: collapse; width: 100%; }
 .compare-legend { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .compare-legend .MuiChip-root { max-width: min(260px, 100%); }
 .compare-legend .MuiChip-root .dot { margin-right: 0; }
+/* Compact enough that all five totals fit on one row in the side panel */
+.tag-totals .MuiChip-label { padding-left: 8px; padding-right: 8px; }
 .compare-table { table-layout: fixed; }
 .compare-table td:not(:first-child), .compare-table th:not(:first-child) { text-align: right; white-space: nowrap; width: 130px; }
 .compare-table th:not(:first-child) .truncate-name { text-transform: none; }
@@ -313,13 +336,16 @@ table { border-collapse: collapse; width: 100%; }
 @media (max-width: 600px) {
   .app { padding: 12px 16px 32px; }
   .brand .small { display: none; }
-  .brand h1 { font-size: 18px; }
+  .brand h1 { font-size: 18px; white-space: nowrap; }
   .logo { width: 40px; height: 40px; }
   .deck-tab { min-width: 120px; }
   /* The name matters more than the card count on a narrow tab */
   .deck-tab-size { display: none; }
   .deck-tab-select { padding: 9px 30px 9px 14px; }
-  .card-panel { padding: 16px; }
+  .card-panel, .workspace-part { padding: 16px; }
+  /* The tag picker spans the panel, its four labels each on one line */
+  .tag-tool .segmented, .tag-tool .MuiToggleButtonGroup-root { width: 100%; }
+  .tag-tool .MuiToggleButton-root { flex: 1 1 auto; padding: 6px 4px; font-size: 12.5px; white-space: nowrap; }
 }
 /* Reduced motion: no transitions at all. (Not a tiny duration: every property would then
    transition, including visibility, which keeps an opening overlay hidden for a frame.) */

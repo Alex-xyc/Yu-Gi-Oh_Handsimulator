@@ -10,7 +10,7 @@ import { DeckSetup } from "../useDeckSetup";
 import { Overlay, SectionHeader, Spinner } from "./common";
 import { DeckLoader } from "./DeckPanel";
 import { ExportButton } from "./ExportButton";
-import { SortControls, TagControls, TagGrid, useDeckOrder, useTagEditor } from "./DecklistView";
+import { SortControls, TagControls, TagGrid, TagHistoryButtons, useDeckOrder, useTagEditor } from "./DecklistView";
 import { HandView } from "./HandView";
 import { ShuffledDeckView } from "./ShuffledDeckView";
 import { SideDeckView } from "./SideDeckView";
@@ -112,18 +112,20 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
 
       {/* Left: labelling controls above the test hand. Right: only the decklist, which fills
           the left column's height (h-0 + min-h-full) and scrolls inside it. The decklist gets
-          two thirds of the width so its 10-card rows stay a readable size. */}
+          two thirds of the width so its 10-card rows stay a readable size.
+          Narrower, it's one column: the left panel splits into two panels (max-lg:contents),
+          the test hand first, then the labelling, then the decklist. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="card-panel flex min-w-0 flex-col gap-5" aria-labelledby={`${id}-label`}>
-          <div>
-            <SectionHeader as="h2" id={`${id}-label`} title="Label your decklist" />
+        <section className="card-panel flex min-w-0 flex-col gap-5 max-lg:contents" aria-labelledby={`${id}-label`}>
+          <div className="workspace-part min-w-0">
+            <SectionHeader as="h2" id={`${id}-label`} title="Label your decklist" action={<TagHistoryButtons editor={editor} />} />
             <TagControls editor={editor} />
           </div>
-          <div className="flex flex-col border-t border-line pt-4">
+          <div className="workspace-part flex min-w-0 flex-col max-lg:-order-1 lg:border-t lg:border-line lg:pt-4">
             <SectionHeader as="h2" title="Test hand" action={
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-wrap justify-end gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-2">
                 <Button variant="outlined" onClick={() => setShowingDeck(true)} disabled={!draw}>
-                  Show shuffled deck
+                  <span className="max-sm:hidden">Show shuffled deck</span><span className="sm:hidden">Shuffled deck</span>
                 </Button>
                 <Button variant="contained" className="min-w-[130px]" onClick={drawHand} disabled={!setup.cards || drawing}>
                   {drawing ? <Spinner /> : draw ? "Draw again" : "Draw hand"}
@@ -156,7 +158,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
             <TagGrid editor={editor} idByName={setup.idByName} sided={setup.sided} order={deckOrder.order} onMove={deckOrder.move} scroll />
           ) : (
             <p className="m-0 grid flex-1 place-items-center p-6 text-center text-muted">
-              Load a deck, then click its cards to label them as engine, non-engine or brick.
+              Load a deck, then click its cards to label them as engine, engine requirement, non-engine or brick.
             </p>
           )}
         </section>

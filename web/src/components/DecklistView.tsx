@@ -1,5 +1,5 @@
-// Tag each card copy as engine / non-engine / brick by clicking it. The controls (TagControls)
-// and the cards (TagGrid) sit in different panels of a deck tab and share one useTagEditor.
+// Tag each card copy as engine / engine requirement / non-engine / brick by clicking it. The controls
+// (TagControls) and the cards (TagGrid) sit in different panels of a deck tab and share one useTagEditor.
 // The cards can be sorted (SortControls) or dragged into any order, one or several at a time;
 // both share one useDeckOrder.
 
@@ -11,14 +11,14 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { motion } from "framer-motion";
 import {
-  KeyboardEvent as ReactKeyboardEvent, memo, MouseEvent as ReactMouseEvent, ReactNode, useCallback, useEffect, useMemo,
+  KeyboardEvent as ReactKeyboardEvent, memo, MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo,
   useState,
 } from "react";
 import { Category, CATEGORIES, CATEGORY_LABELS, DeckCard, TagKey } from "../api";
 import { CardImage, Segmented } from "./common";
 
 /** The theme colour for each tag */
-const TAG_COLOR = { engine: "engine", non_engine: "nonEngine", brick: "brick" } as const;
+const TAG_COLOR = { engine: "engine", requirement: "requirement", non_engine: "nonEngine", brick: "brick" } as const;
 
 /** Whether a key press is meant for a text field rather than a shortcut */
 const typing = (target: EventTarget | null) =>
@@ -104,46 +104,50 @@ export function useTagEditor({ deckList, tags, onChange, shortcuts = true }: {
   }, [deckList, tags, tool, allCopies, history, undo, onChange]);
 }
 
-/** Totals, Undo / Clear all, the tag to apply and "mark the rest" */
-export const TagControls = memo(function TagControls({ editor, actions }: { editor: TagEditor; actions?: ReactNode }) {
+/** Undo / Clear all, for the tagging panel's header */
+export const TagHistoryButtons = memo(function TagHistoryButtons({ editor }: { editor: TagEditor }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Tooltip title="Undo (Ctrl+Z)">
+        <span><Button color="inherit" size="small" onClick={editor.undo} disabled={!editor.canUndo}>Undo</Button></span>
+      </Tooltip>
+      <Button color="inherit" size="small" onClick={editor.clearAll} disabled={!editor.tags.some(Boolean)}>
+        Clear all
+      </Button>
+    </div>
+  );
+});
+
+/** Totals, the tag to apply and "mark the rest" */
+export const TagControls = memo(function TagControls({ editor }: { editor: TagEditor }) {
   const disabled = editor.deckList.length === 0;
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIES.map((key) => (
-            <Chip key={key} color={TAG_COLOR[key]} label={<>{CATEGORY_LABELS[key]} <b>{editor.count(key)}</b></>} />
-          ))}
-          <Chip label={<>Untagged <b>{editor.untagged}</b></>} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Tooltip title="Undo (Ctrl+Z)">
-            <span><Button color="inherit" size="small" onClick={editor.undo} disabled={!editor.canUndo}>Undo</Button></span>
-          </Tooltip>
-          <Button color="inherit" size="small" onClick={editor.clearAll} disabled={!editor.tags.some(Boolean)}>
-            Clear all
-          </Button>
-          {actions}
-        </div>
+      <div className="tag-totals flex flex-wrap gap-1">
+        {CATEGORIES.map((key) => (
+          <Chip key={key} color={TAG_COLOR[key]} label={<>{CATEGORY_LABELS[key]} <b>{editor.count(key)}</b></>} />
+        ))}
+        <Chip label={<>Untagged <b>{editor.untagged}</b></>} />
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="tag-tool flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-muted">Click a card to tag it as</span>
           <Segmented value={editor.tool} onChange={editor.setTool} label="Tag to apply"
                      options={CATEGORIES.map((key) => ({ value: key, label: CATEGORY_LABELS[key], tone: key }))} />
           <FormControlLabel label="Label all copies" disabled={disabled}
                             control={<Checkbox checked={editor.allCopies} onChange={(e) => editor.setAllCopies(e.target.checked)} />} />
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-muted">Mark the rest ({editor.untagged}) as</span>
-          {CATEGORIES.map((key) => (
-            <Button key={key} variant="outlined" size="small" color={TAG_COLOR[key]} disabled={!editor.untagged}
-                    onClick={() => editor.tagRest(key)}>
-              {CATEGORY_LABELS[key]}
-            </Button>
-          ))}
-          <span className="text-xs text-muted">Click again or right-click to untag</span>
+        <div className="flex flex-col gap-2">
+          <span className="text-muted">Mark the rest ({editor.untagged}) as:</span>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {CATEGORIES.map((key) => (
+              <Button key={key} variant="outlined" size="small" color={TAG_COLOR[key]} disabled={!editor.untagged}
+                      onClick={() => editor.tagRest(key)}>
+                {CATEGORY_LABELS[key]}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -163,7 +167,7 @@ const KIND_ORDER = [
   "spell_normal", "spell_quick_play", "spell_continuous", "spell_field", "spell_equip", "spell_ritual",
   "trap_normal", "trap_continuous", "trap_counter",
 ];
-const LABEL_ORDER: Record<Category, number> = { engine: 0, non_engine: 1, brick: 2, "": 3 };
+const LABEL_ORDER: Record<Category, number> = { engine: 0, requirement: 1, non_engine: 2, brick: 3, "": 4 };
 
 /** Deck positions sorted by name within each card type (the arrow flips the names, not the
  *  types), or by label (the arrow flips the labels; unlabelled cards stay last), then type, then name */
@@ -322,7 +326,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
   // crossing over each other, quick clicks of the sort buttons left them in a jumble mid-flight.
   return (
     <>
-      <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 px-1 pb-1.5 text-xs text-muted" aria-live="polite">
+      <div className="flex flex-wrap [@media(hover:hover)]:min-h-8 items-center gap-x-3 gap-y-1 px-1 pb-1.5 text-xs text-muted" aria-live="polite">
         {selected.size ? (
           <>
             <span className="selection-count">{selected.size} selected</span>
@@ -330,7 +334,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
             <Button size="small" color="inherit" onClick={clear} className="ml-auto">Clear selection (Esc)</Button>
           </>
         ) : (
-          <span>Drag a card to move it · <b className="font-semibold text-text">Shift+click</b> to select several and move them together</span>
+          <span className="mouse-hint">Drag a card to move it · <b className="font-semibold text-text">Shift+click</b> to select several and move them together</span>
         )}
         {sided?.some(Boolean) && (
           <span className={`flex items-center gap-1.5 ${selected.size ? "" : "ml-auto"}`}>

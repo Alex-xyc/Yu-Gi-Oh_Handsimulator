@@ -14,6 +14,8 @@ import tempfile
 import card_cache
 import main
 from ygo_calc.cards import cache
+from ygo_calc.cards.edopro import _edopro_info
+from ygo_calc.cards.ygoprodeck import card_info
 
 
 def mock_api(fake_data):
@@ -63,6 +65,32 @@ class TestAPIMock(unittest.TestCase):
         with api, edopro:
             res = main.fetch_multiple_card_names(['999'], verbose=False)
             self.assertEqual(res, {})
+
+class TestBanStatus(unittest.TestCase):
+    MONSTER = {"type": "Effect Monster", "frameType": "effect", "level": 3}
+
+    def status(self, **fields):
+        return card_info({**self.MONSTER, **fields})["status"]
+
+    def test_tcg_banlist(self):
+        self.assertEqual(self.status(banlist_info={"ban_tcg": "Forbidden", "ban_ocg": "Limited"}), "banned")
+        self.assertEqual(self.status(banlist_info={"ban_tcg": "Limited"}), "limited")
+        self.assertEqual(self.status(banlist_info={"ban_tcg": "Semi-Limited"}), "semi_limited")
+        # Only the OCG's list doesn't count
+        self.assertEqual(self.status(banlist_info={"ban_ocg": "Semi-Limited"},
+                                     misc_info=[{"formats": ["TCG", "OCG"]}]), "")
+        self.assertEqual(self.status(), "")
+
+    def test_ocg_only(self):
+        self.assertEqual(self.status(misc_info=[{"formats": ["OCG"]}]), "ocg")
+        self.assertEqual(self.status(misc_info=[{"formats": ["TCG", "OCG"]}]), "")
+
+    def test_edopro_regions(self):
+        self.assertEqual(_edopro_info(0x21, 4, 0x1)["status"], "ocg")
+        self.assertEqual(_edopro_info(0x21, 4, 0x101)["status"], "ocg")  # OCG pre-release
+        self.assertEqual(_edopro_info(0x21, 4, 0x3)["status"], "")
+        self.assertEqual(_edopro_info(0x21, 4, 0x102)["status"], "")  # TCG pre-release
+
 
 if __name__ == '__main__':
     unittest.main()
