@@ -58,7 +58,7 @@ def apply_window_icon(window: tk.Tk) -> None:
             try:
                 if PIL_AVAILABLE:
                     img = Image.open(icon_path).convert("RGBA")
-                    img = img.resize((64, 64), Image.LANCZOS)
+                    img = img.resize((64, 64), Image.Resampling.LANCZOS)
                     tk_img = ImageTk.PhotoImage(img)
                     window.iconphoto(True, tk_img)
                     # keep reference to avoid GC

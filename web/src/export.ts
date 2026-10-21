@@ -2,9 +2,7 @@
 // only loaded when an export is clicked.
 
 import type { Workbook, Worksheet } from "exceljs";
-import {
-  CATEGORY_LABELS, combinationOdds, Comparison, DrawResult, OddsPair, percentDigits, shownCategories, Stats,
-} from "./api";
+import { CATEGORIES, CATEGORY_LABELS, combinationOdds, Comparison, DrawResult, OddsPair, percentDigits, Stats } from "./api";
 
 type Cell = string | number | null;
 /** How a column's numbers are shown */
@@ -105,15 +103,14 @@ export async function exportStats({ name, first, second, draw, labelled }: {
   sheet.getCell(2, 1).value = `Exported ${new Date().toLocaleString()} · going first = 5-card hand, going second = 6 cards`;
   sheet.getCell(2, 1).font = { italic: true, color: { argb: "FF6B7280" } };
 
-  const categories = shownCategories(first.counts);
   let row = addTable(sheet, 4, "Composition", ["", "Cards"], ["text", "number"], [
     ["Deck size", first.deck_size],
-    ...categories.map((key): Cell[] => [CATEGORY_LABELS[key], first.counts[key]]),
+    ...CATEGORIES.map((key): Cell[] => [CATEGORY_LABELS[key], first.counts[key]]),
     ["Untagged", first.counts.untagged],
   ]);
 
   // Chance of drawing X or more: 1..5 going first, 1..6 going second
-  const atLeast = categories.flatMap((key) =>
+  const atLeast = CATEGORIES.flatMap((key) =>
     second.at_least[key].map((p2, i): Cell[] => [
       `At least ${i + 1} ${CATEGORY_LABELS[key].toLowerCase()}`, first.at_least[key][i] ?? null, p2,
     ]));
@@ -123,7 +120,7 @@ export async function exportStats({ name, first, second, draw, labelled }: {
     first.combinations.map((c, i) => [c.label, c.probability, second.combinations[i]?.probability ?? null]));
 
   row = addTable(sheet, row, "Average per hand", both, ["text", "decimal", "decimal"],
-    categories.map((key) => [CATEGORY_LABELS[key], first.averages[key], second.averages[key]]));
+    CATEGORIES.map((key) => [CATEGORY_LABELS[key], first.averages[key], second.averages[key]]));
 
   row = addTable(sheet, row, "Bricks", both, pct, [
     ["Open with a brick", first.bricks.open, second.bricks.open],
@@ -150,7 +147,7 @@ export async function exportStats({ name, first, second, draw, labelled }: {
   if (sixth) {
     row = addTable(sheet, row, "6th card (based on the test hand)", ["", "Left in deck", "Chance"],
       ["text", "number", "percent"],
-      categories.map((key) => [CATEGORY_LABELS[key], sixth[key].remaining, sixth[key].probability]));
+      CATEGORIES.map((key) => [CATEGORY_LABELS[key], sixth[key].remaining, sixth[key].probability]));
   }
 
   addTable(sheet, row, "Card odds (at least 1 copy)", ["Card", "Qty", "Label", "Going first", "Going second"],

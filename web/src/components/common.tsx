@@ -180,7 +180,7 @@ export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
 export interface SegmentOption<T> {
   value: T;
   label: ReactNode;
-  /** Colours the pill: a tag (engine, requirement, non_engine, brick); the accent otherwise */
+  /** Colours the pill: a tag (engine, non_engine, brick); the accent otherwise */
   tone?: string;
 }
 
@@ -276,7 +276,7 @@ export function Bar({ value, tone }: { value: number; tone: string }) {
 }
 
 /** A colour of a label or deck, as used by the tone-* classes */
-export type Tone = "engine" | "requirement" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
+export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
 
 /** The tone of a deck in the comparison: side 0 is deck A (blue), side 1 deck B (pink) */
 export const deckTone = (side: number): Tone => (side ? "deck-b" : "deck-a");

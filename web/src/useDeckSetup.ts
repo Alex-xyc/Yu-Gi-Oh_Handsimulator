@@ -1,4 +1,4 @@
-// One deck and the label (engine / engine requirement / non-engine / brick) of each card copy, set in the decklist view,
+// One deck and the label (engine / non-engine / brick) of each card copy, set in the decklist view,
 // plus its side deck, whose cards can be swapped with the main deck's. Every copy keeps its label
 // and which deck it started in as it moves between the two.
 

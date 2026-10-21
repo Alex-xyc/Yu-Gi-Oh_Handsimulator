@@ -3,20 +3,18 @@
 from fractions import Fraction
 from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
-from .categories import BRICK, CATEGORIES, ENGINE, NON_ENGINE, REQUIREMENT, CardPool, count_categories
+from .categories import BRICK, CATEGORIES, ENGINE, NON_ENGINE, CardPool, count_categories
 from .probability import (category_probability, engine_non_engine_probability,
                           exact_probability_at_least, probability_at_least)
 
-# Draw counts are passed to each check as (engine, non-engine, brick, engine requirement)
-Drawn = Tuple[int, int, int, int]
+# Draw counts are passed to each check as (engine, non-engine, brick)
+Drawn = Tuple[int, int, int]
 
 
 class HandOdds(NamedTuple):
     label: str
     accept: Callable[[Drawn], bool]
     higher_is_better: bool
-    # Only shown for decks with engine requirements (the odds would just repeat engine ones)
-    requirement: bool = False
 
 
 # Opening-hand checks shown for one deck (here) and for two side by side (comparison.py)
@@ -30,26 +28,13 @@ HAND_ODDS = [
     HandOdds("1+ engine & 1+ non-engine", lambda d: d[0] >= 1 and d[1] >= 1, True),
     HandOdds("1+ engine & no bricks", lambda d: d[0] >= 1 and d[2] == 0, True),
     HandOdds("1+ engine, 1+ NE, no bricks", lambda d: d[0] >= 1 and d[1] >= 1 and d[2] == 0, True),
-    HandOdds("At least 1 engine req.", lambda d: d[3] >= 1, True, True),
-    HandOdds("At least 2 engine req.", lambda d: d[3] >= 2, True, True),
-    # A starter plus the piece its combo needs
-    HandOdds("1+ engine & 1+ engine req.", lambda d: d[0] >= 1 and d[3] >= 1, True, True),
-    # Able to start a combo: a starter, or two requirements (a two-card combo)
-    HandOdds("1+ engine or 2+ engine req.", lambda d: d[0] >= 1 or d[3] >= 2, True, True),
 ]
-
-
-def shown_hand_odds(*pools: CardPool) -> List[bool]:
-    """Per HAND_ODDS entry, whether it applies to these decks (requirement odds need one with
-    engine requirements)."""
-    has_requirement = any(category == REQUIREMENT for pool in pools for _, category in pool)
-    return [has_requirement or not odds.requirement for odds in HAND_ODDS]
 
 
 def pool_hand_odds(pool: CardPool, hand_size: int) -> List[float]:
     """Chance of each HAND_ODDS entry, in that order."""
     counts = count_categories(pool)
-    category_counts = (counts[ENGINE], counts[NON_ENGINE], counts[BRICK], counts[REQUIREMENT])
+    category_counts = (counts[ENGINE], counts[NON_ENGINE], counts[BRICK])
     return [category_probability(len(pool), category_counts, hand_size, odds.accept)
             for odds in HAND_ODDS]
 
@@ -97,8 +82,8 @@ def opening_stats(pool: CardPool, hand_categories: Optional[List[str]] = None,
 
     # The combinations not already covered by at_least
     combinations = [{"label": odds.label, "probability": p}
-                    for odds, p, shown in zip(HAND_ODDS, pool_hand_odds(pool, hand_size), shown_hand_odds(pool))
-                    if shown and not odds.label.startswith("At least")]
+                    for odds, p in zip(HAND_ODDS, pool_hand_odds(pool, hand_size))
+                    if not odds.label.startswith("At least")]
     averages = {key: hand_size * counts[key] / deck_size if deck_size else 0.0 for key in CATEGORIES}
 
     return {

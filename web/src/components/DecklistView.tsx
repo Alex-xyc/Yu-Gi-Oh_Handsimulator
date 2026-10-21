@@ -1,5 +1,5 @@
-// Tag each card copy as engine / engine requirement / non-engine / brick by clicking it. The controls
-// (TagControls) and the cards (TagGrid) sit in different panels of a deck tab and share one useTagEditor.
+// Tag each card copy as engine / non-engine / brick by clicking it. The controls (TagControls)
+// and the cards (TagGrid) sit in different panels of a deck tab and share one useTagEditor.
 // The cards can be sorted (SortControls) or dragged into any order, one or several at a time;
 // both share one useDeckOrder.
 
@@ -18,7 +18,7 @@ import { Category, CATEGORIES, CATEGORY_LABELS, DeckCard, TagKey } from "../api"
 import { CardImage, Segmented } from "./common";
 
 /** The theme colour for each tag */
-const TAG_COLOR = { engine: "engine", requirement: "requirement", non_engine: "nonEngine", brick: "brick" } as const;
+const TAG_COLOR = { engine: "engine", non_engine: "nonEngine", brick: "brick" } as const;
 
 /** Whether a key press is meant for a text field rather than a shortcut */
 const typing = (target: EventTarget | null) =>
@@ -167,7 +167,7 @@ const KIND_ORDER = [
   "spell_normal", "spell_quick_play", "spell_continuous", "spell_field", "spell_equip", "spell_ritual",
   "trap_normal", "trap_continuous", "trap_counter",
 ];
-const LABEL_ORDER: Record<Category, number> = { engine: 0, requirement: 1, non_engine: 2, brick: 3, "": 4 };
+const LABEL_ORDER: Record<Category, number> = { engine: 0, non_engine: 1, brick: 2, "": 3 };
 
 /** Deck positions sorted by name within each card type (the arrow flips the names, not the
  *  types), or by label (the arrow flips the labels; unlabelled cards stay last), then type, then name */

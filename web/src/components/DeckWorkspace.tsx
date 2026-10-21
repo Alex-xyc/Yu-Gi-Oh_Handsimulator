@@ -158,7 +158,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
             <TagGrid editor={editor} idByName={setup.idByName} sided={setup.sided} order={deckOrder.order} onMove={deckOrder.move} scroll />
           ) : (
             <p className="m-0 grid flex-1 place-items-center p-6 text-center text-muted">
-              Load a deck, then click its cards to label them as engine, engine requirement, non-engine or brick.
+              Load a deck, then click its cards to label them as engine, non-engine or brick.
             </p>
           )}
         </section>

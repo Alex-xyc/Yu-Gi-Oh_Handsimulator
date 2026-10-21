@@ -9,7 +9,7 @@ SRC_PATH = os.path.join(ROOT, 'src')
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
-from ygo_calc.core.categories import (BRICK, ENGINE, NON_ENGINE, REQUIREMENT, UNTAGGED, count_categories,
+from ygo_calc.core.categories import (BRICK, ENGINE, NON_ENGINE, UNTAGGED, count_categories,
                                       pool_from_category_sets, pool_from_counts, pool_from_tags,
                                       sync_category_sets)
 from ygo_calc.core.deck import YuGiOhDeck
@@ -33,7 +33,7 @@ class TestCategories(unittest.TestCase):
         # 2 bricks: the first two Ash copies; the third Ash is non-engine
         pool = pool_from_counts(make_deck(), brick=2, non_engine=2, engine=1)
         self.assertEqual([c for _, c in pool], [BRICK, BRICK, NON_ENGINE, NON_ENGINE, ENGINE, UNTAGGED])
-        self.assertEqual(count_categories(pool), {BRICK: 2, NON_ENGINE: 2, ENGINE: 1, REQUIREMENT: 0})
+        self.assertEqual(count_categories(pool), {BRICK: 2, NON_ENGINE: 2, ENGINE: 1})
 
     def test_tags_and_category_sets_round_trip(self):
         deck = make_deck()
@@ -92,16 +92,6 @@ class TestReport(unittest.TestCase):
         self.assertIn("Engine:       45.7% (16/35)", report)
         for section in ("BRICK ANALYSIS", "6TH CARD ODDS", "Engine x Non-Engine Matrix"):
             self.assertIn(section, report)
-
-    def test_report_engine_requirements(self):
-        counts = {BRICK: 5, NON_ENGINE: 10, ENGINE: 15, REQUIREMENT: 6}
-        report = format_statistics_report(40, counts, [ENGINE, REQUIREMENT, NON_ENGINE, BRICK, ENGINE])
-        self.assertIn("| Engine Req.: 6", report)
-        self.assertIn("ENGINE REQUIREMENTS", report)
-        self.assertIn("1+ engine & 1+ engine req.:", report)
-        self.assertIn("Engine Req.:  14.3% (5/35)", report)
-        # Without any, the section stays out
-        self.assertNotIn("ENGINE REQUIREMENTS", format_statistics_report(40, {**counts, REQUIREMENT: 0}, None))
 
     def test_report_without_hand_categories(self):
         # Typed counts: totals-based odds stay, hand-based 6th-card odds are left out
