@@ -16,7 +16,7 @@ from typing import Callable, Dict, List, Optional
 
 import customtkinter as ctk
 
-from ..core.categories import BRICK, ENGINE, NON_ENGINE, REQUIREMENT, UNTAGGED
+from ..core.categories import BRICK, ENGINE, NON_ENGINE, UNTAGGED
 from . import theme
 from .image_loader import PIL_AVAILABLE
 
@@ -31,7 +31,6 @@ TAGS = {
     BRICK: ("Brick", "#dc2626"),
     NON_ENGINE: ("Non-Engine", "#eab308"),
     ENGINE: ("Engine", "#16a34a"),
-    REQUIREMENT: ("Engine Req.", "#0d9488"),
 }
 UNTAG = UNTAGGED
 TINT_OPACITY = 0.45
@@ -280,8 +279,7 @@ class AdvancedDeckView(ctk.CTkFrame):
         untagged = self.tags.count(UNTAG)
         self.counts_label.configure(
             text=(f"Bricks: {counts['brick']}  |  Non-Engine: {counts['non_engine']}  |  "
-                  f"Engine: {counts['engine']}  |  Engine Req.: {counts['requirement']}  |  "
-                  f"Untagged: {untagged}  "
+                  f"Engine: {counts['engine']}  |  Untagged: {untagged}  "
                   f"(Total: {len(self.deck_list)})"))
         self.bulk_label.configure(text=f"Mark the rest ({untagged} untagged) as:")
         for key, button in zip(TAGS, self.bulk_buttons):

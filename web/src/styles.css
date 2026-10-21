@@ -17,7 +17,6 @@
 
 /* Tones: a component's colour (--tone) from a label or deck, e.g. "tone-engine", "tone-deck-a" */
 .tone-engine { --tone: var(--color-engine); }
-.tone-requirement { --tone: var(--color-requirement); }
 .tone-non_engine { --tone: var(--color-non-engine); }
 .tone-brick { --tone: var(--color-brick); }
 .tone-deck-a { --tone: var(--color-deck-a); }

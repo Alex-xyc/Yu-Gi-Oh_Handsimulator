@@ -25,7 +25,7 @@ export interface SavedTabs {
   decks: Record<number, SavedDeck>;
 }
 
-const TAGS = new Set<string>(["", "engine", "requirement", "non_engine", "brick"]);
+const TAGS = new Set<string>(["", "engine", "non_engine", "brick"]);
 
 const validCards = (cards: unknown): cards is DeckCard[] => Array.isArray(cards) && cards.every((c) =>
   c && typeof c.name === "string" && typeof c.id === "string" && Number.isInteger(c.copies) && c.copies > 0);

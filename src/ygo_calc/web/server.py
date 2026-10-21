@@ -60,14 +60,13 @@ class Counts(BaseModel):
     brick: int = Field(0, ge=0)
     non_engine: int = Field(0, ge=0)
     engine: int = Field(0, ge=0)
-    requirement: int = Field(0, ge=0)
 
 
 class DeckSetup(BaseModel):
     """A deck plus its categories: per-copy tags (from the decklist view) or typed counts."""
     name: str = Field("Deck", max_length=40)
     cards: List[Card] = Field(min_length=1, max_length=YuGiOhDeck.MAX_DECK_SIZE)
-    tags: Optional[List[Literal["brick", "non_engine", "engine", "requirement", ""]]] = None
+    tags: Optional[List[Literal["brick", "non_engine", "engine", ""]]] = None
     counts: Optional[Counts] = None
     # Per copy, in deck order: whether it was swapped in from the side deck (the draw marks those cards)
     sided: Optional[List[bool]] = Field(None, max_length=YuGiOhDeck.MAX_DECK_SIZE)
@@ -95,10 +94,10 @@ class DeckSetup(BaseModel):
                 raise HTTPException(400, "Tags don't match the deck.")
             return pool_from_tags(deck, list(self.tags))
         counts = self.counts or Counts()
-        total = counts.brick + counts.non_engine + counts.engine + counts.requirement
+        total = counts.brick + counts.non_engine + counts.engine
         if total > size:
             raise HTTPException(400, f"{self.name}: total counts ({total}) exceed deck size ({size}).")
-        return pool_from_counts(deck, counts.brick, counts.non_engine, counts.engine, counts.requirement)
+        return pool_from_counts(deck, counts.brick, counts.non_engine, counts.engine)
 
 
 class DrawRequest(BaseModel):

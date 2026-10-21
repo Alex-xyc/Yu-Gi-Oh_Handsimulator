@@ -5,7 +5,7 @@
 // theme.ts for the MUI components.
 //
 // Naming: kebab-case. Colours are named by role, not by hue (surface, line, accent, ink);
-// the tag colours match the data keys (engine, requirement, non-engine, brick).
+// the tag colours match the data keys (engine, non-engine, brick).
 
 export const colors = {
   /** Page background, behind everything */
@@ -33,9 +33,8 @@ export const colors = {
   /** The call to action in the comparison (React-logo blue) */
   highlight: "#61dafb",
   "highlight-hover": "#8ae4fc",
-  /** Card labels: brick red, non-engine yellow, engine green, engine requirement teal */
+  /** Card labels: brick red, non-engine yellow, engine green */
   engine: "#22c55e",
-  requirement: "#2dd4bf",
   "non-engine": "#eab308",
   brick: "#ef4444",
   /** The two decks in the comparison: blue and pink, apart from the accent and the labels */

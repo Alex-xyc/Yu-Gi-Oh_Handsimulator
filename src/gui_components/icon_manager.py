@@ -34,7 +34,7 @@ def set_app_icon(app):
             try:
                 if PIL_AVAILABLE:
                     img = Image.open(icon_path).convert("RGBA")
-                    img = img.resize((64, 64), Image.LANCZOS)
+                    img = img.resize((64, 64), Image.Resampling.LANCZOS)
                     tk_img = ImageTk.PhotoImage(img)
                     app.iconphoto(True, tk_img)
                     app._icon_img = tk_img

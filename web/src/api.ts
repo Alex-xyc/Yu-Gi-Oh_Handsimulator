@@ -1,21 +1,14 @@
 // Types and calls for the Python API (src/ygo_calc/web/server.py)
 
-/** "requirement": an engine requirement, a card that isn't a starter but is needed alongside one
- *  for the combo, or is half of a two-card combo */
-export type Category = "brick" | "non_engine" | "engine" | "requirement" | "";
-export const CATEGORIES = ["engine", "requirement", "non_engine", "brick"] as const;
+export type Category = "brick" | "non_engine" | "engine" | "";
+export const CATEGORIES = ["engine", "non_engine", "brick"] as const;
 export type TagKey = (typeof CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<TagKey, string> = {
   engine: "Engine",
-  requirement: "Engine Req.",
   non_engine: "Non-Engine",
   brick: "Brick",
 };
-
-/** The categories to show odds for: engine requirements only when the deck has some */
-export const shownCategories = (counts: Record<TagKey, number>): TagKey[] =>
-  CATEGORIES.filter((key) => key !== "requirement" || counts[key] > 0);
 
 /** A card's TCG banlist status: "ocg" when it's out in the OCG but not the TCG yet, "" when unlimited
  *  (or not known) */
@@ -38,7 +31,6 @@ export interface Counts {
   brick: number;
   non_engine: number;
   engine: number;
-  requirement: number;
 }
 
 export interface DeckSetupBody {

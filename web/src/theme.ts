@@ -5,16 +5,12 @@
 import { alpha, createTheme, PaletteColor, PaletteColorOptions, ThemeOptions } from "@mui/material/styles";
 import { colors, ease, font } from "./design/tokens";
 
-type AppColor = "engine" | "requirement" | "nonEngine" | "brick" | "deckA" | "deckB";
+type AppColor = "engine" | "nonEngine" | "brick" | "deckA" | "deckB";
 
 declare module "@mui/material/styles" {
-  interface Palette {
-    engine: PaletteColor; requirement: PaletteColor; nonEngine: PaletteColor; brick: PaletteColor;
-    deckA: PaletteColor; deckB: PaletteColor;
-  }
+  interface Palette { engine: PaletteColor; nonEngine: PaletteColor; brick: PaletteColor; deckA: PaletteColor; deckB: PaletteColor }
   interface PaletteOptions {
-    engine?: PaletteColorOptions; requirement?: PaletteColorOptions; nonEngine?: PaletteColorOptions;
-    brick?: PaletteColorOptions;
+    engine?: PaletteColorOptions; nonEngine?: PaletteColorOptions; brick?: PaletteColorOptions;
     deckA?: PaletteColorOptions; deckB?: PaletteColorOptions;
   }
 }
@@ -32,8 +28,7 @@ const SURFACE_3 = colors["surface-3"];
 const BORDER_STRONG = colors["line-strong"];
 const EASE = ease;
 const COLORS: Record<AppColor | "primary", string> = {
-  primary: ACCENT, engine: colors.engine, requirement: colors.requirement, nonEngine: colors["non-engine"],
-  brick: colors.brick,
+  primary: ACCENT, engine: colors.engine, nonEngine: colors["non-engine"], brick: colors.brick,
   deckA: colors["deck-a"], deckB: colors["deck-b"],
 };
 
@@ -62,7 +57,6 @@ const options: ThemeOptions = {
   palette: {
     // Dark text on the bright colours keeps it readable (WCAG AA)
     engine: color(COLORS.engine, colors.ink),
-    requirement: color(COLORS.requirement, colors.ink),
     nonEngine: color(COLORS.nonEngine, colors.ink),
     brick: color(COLORS.brick, colors.ink),
     deckA: color(COLORS.deckA, colors.ink),
@@ -99,7 +93,7 @@ const options: ThemeOptions = {
         { props: { variant: "text", color: "inherit" },
           style: { border: `1px solid ${BORDER_STRONG}`, "&:hover": { background: SURFACE_3 } } },
         // Coloured outlines: a soft tint of the colour
-        ...(["primary", "engine", "requirement", "nonEngine", "brick"] as const).map((key) => ({
+        ...(["primary", "engine", "nonEngine", "brick"] as const).map((key) => ({
           props: { variant: "outlined" as const, color: key },
           style: {
             color: key === "primary" ? "#c9bcff" : TEXT,
@@ -149,7 +143,7 @@ const options: ThemeOptions = {
         label: { paddingLeft: 10, paddingRight: 10 },
         icon: { marginLeft: 10, marginRight: -4 },
       },
-      variants: (["engine", "requirement", "nonEngine", "brick", "deckA", "deckB"] as const).map((key) => ({
+      variants: (["engine", "nonEngine", "brick", "deckA", "deckB"] as const).map((key) => ({
         props: { color: key },
         style: { color: TEXT, background: alpha(COLORS[key], 0.16), borderColor: alpha(COLORS[key], 0.4) },
       })),
