@@ -134,6 +134,13 @@
 .odds-groups .odds-rows { padding: 12px 0; border-top: 1px solid var(--color-line); }
 .odds-groups .odds-rows:first-child { border-top: none; padding-top: 0; }
 .odds-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto; align-items: center; gap: 12px; }
+/* Going first and second side by side, with a line between; shorter bars make room */
+.odds-split { display: grid; grid-template-columns: 1fr 1fr; padding: 12px 0; border-top: 1px solid var(--color-line); }
+.odds-split:first-child { border-top: none; padding: 0 0 8px; }
+.odds-groups .odds-split > * { min-width: 0; padding: 0 20px 0 0; border: none; }
+.odds-groups .odds-split > * + * { padding: 0 0 0 20px; border-left: 1px solid var(--color-line); }
+/* One label width for every category, so all the bars start in line */
+.odds-split .odds-row { grid-template-columns: 7.5em minmax(40px, 1fr) auto; }
 /* As wide as the longest value in the section (--value-ch characters), so the bars line up */
 /* Two value columns (going first and second); the first has the bar */
 .odds-row.two-values { grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto auto; }
@@ -325,6 +332,13 @@ table { border-collapse: collapse; width: 100%; }
   .odds-row { grid-template-columns: 1fr auto; }
   .odds-row.two-values { grid-template-columns: 1fr auto auto; }
   .odds-row .bar { grid-column: 1 / -1; grid-row: 2; }
+  /* Going first above going second, each block labelled */
+  .odds-split { grid-template-columns: 1fr; }
+  .odds-split .odds-row { grid-template-columns: 1fr auto; }
+  .odds-split:first-child { display: none; }
+  .odds-split:nth-child(2) { border-top: none; padding-top: 0; }
+  .odds-groups .odds-split > * + * { padding: 12px 0 0; border-left: none; }
+  .odds-split .odds-rows::before { content: attr(data-side); font-size: 12px; color: var(--color-muted); }
   .overlay-backdrop.window { padding: 16px; }
   .overlay-backdrop.window .overlay-panel { max-height: 100%; }
   .overlay-backdrop.window .overlay-panel.fit { height: 100%; }

@@ -86,7 +86,11 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
   }
   const maxCell = Math.max(...stats.matrix.flat().map((p) => p ?? 0), 0.0001);
   // The value column fits the longest number, so every row's bar lines up
-  const valueWidth = percentWidth(CATEGORIES.flatMap((key) => stats.at_least[key]));
+  // Going second draws one more card: at least 1 .. hand_size + 1 of each category
+  const atLeastSecond = Object.fromEntries(CATEGORIES.map((key) => [key,
+    Array.from({ length: stats.hand_size + 1 }, (_, i) => atLeast(stats.deck_size, stats.counts[key], stats.hand_size + 1, i + 1)),
+  ])) as Record<(typeof CATEGORIES)[number], number[]>;
+  const valueWidth = percentWidth(CATEGORIES.flatMap((key) => [...stats.at_least[key], ...atLeastSecond[key]]));
   const grouped = tagged;
 
   // Opening at least 1 .. 5 of the cards sided in, going first and second
@@ -110,14 +114,24 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
       </div>
 
       <Section title="Opening hand" hint="(chance of drawing X or more)">
+        {/* Going first (left) and second (right) side by side, one block per category */}
         <div className="odds-groups" style={{ ["--value-ch" as string]: valueWidth }}>
+          <div className="odds-split small muted">
+            <span>Going first ({stats.hand_size} cards)</span>
+            <span>Going second ({stats.hand_size + 1} cards)</span>
+          </div>
           {CATEGORIES.map((key) => (
-            <div key={key} className="odds-rows">
-              {stats.at_least[key].map((p, i) => (
-                <div key={i} className="odds-row">
-                  <span>At least {i + 1} {CATEGORY_LABELS[key].toLowerCase()}{key === "brick" && i ? "s" : ""}</span>
-                  <Bar value={p} tone={key} />
-                  <span className="mono value"><AnimatedPercent value={p} /></span>
+            <div key={key} className="odds-split">
+              {[stats.at_least[key], atLeastSecond[key]].map((odds, side) => (
+                <div key={side} className="odds-rows" aria-label={side ? "Going second" : "Going first"}
+                     data-side={side ? `Going second (${stats.hand_size + 1} cards)` : `Going first (${stats.hand_size} cards)`}>
+                  {odds.map((p, i) => (
+                    <div key={i} className="odds-row">
+                      <span>{i + 1} {CATEGORY_LABELS[key].toLowerCase()}{key === "brick" && i ? "s" : ""}</span>
+                      <Bar value={p} tone={key} />
+                      <span className="mono value"><AnimatedPercent value={p} /></span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

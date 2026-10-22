@@ -113,7 +113,11 @@ def image_cache_dir() -> str:
         local = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".cache")
         base = os.path.join(local, "YGO-Calc")
     path = os.path.join(base, "images")
-    os.makedirs(path, exist_ok=True)
+    # Without it images are still served, just not kept (reading and saving them handle that)
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        logging.exception("Can't create the image cache folder %s", path)
     return path
 
 
