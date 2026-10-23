@@ -270,10 +270,7 @@ function AdvancedControls({ editor }: { editor: TagEditor }) {
   const disabled = editor.deckList.length === 0;
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-muted">Pick a label, then click cards to give it to them</span>
-        <AdvancedSwitch advanced />
-      </div>
+      <span className="text-muted">Pick a label, then click cards to give it to them</span>
       <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0" aria-label="Labels">
         {CATEGORIES.map((key) => (
           <LabelPill key={key} name={CATEGORY_LABELS[key]} count={editor.count(key)} tone={key}
@@ -284,11 +281,13 @@ function AdvancedControls({ editor }: { editor: TagEditor }) {
                      color={label.color} selected={editor.tool === label.id} onSelect={() => editor.setTool(label.id)} />
         ))}
       </fieldset>
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-        <LabelNameField keepOpen placeholder="New label, e.g. Starter"
-                        onSave={(name) => { const label = labelSettings.add(name); if (label) editor.setTool(label.id); }} />
+      <LabelNameField keepOpen placeholder="New label, e.g. Starter"
+                      onSave={(name) => { const label = labelSettings.add(name); if (label) editor.setTool(label.id); }} />
+      {/* The switch on the right of "Label all copies" */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <FormControlLabel label="Label all copies" disabled={disabled}
                           control={<Checkbox checked={editor.allCopies} onChange={(e) => editor.setAllCopies(e.target.checked)} />} />
+        <AdvancedSwitch advanced />
       </div>
       <span className="text-xs text-muted">
         A card can have a custom label as well as engine, non-engine or brick · right-click a card to take its labels off
