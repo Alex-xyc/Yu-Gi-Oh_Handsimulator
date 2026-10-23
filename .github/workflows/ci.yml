@@ -53,11 +53,19 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Install packages
+        run: npm ci
+
+      # Lint rules in web/biome.json; problems show up as annotations on the changed lines
+      - name: Lint (Biome)
+        run: npx biome ci --reporter=github
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
       # Type-checks and builds the front end, as the Docker build does
       - name: Build the front end
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Check for known vulnerabilities in the shipped packages
         run: npm audit --omit=dev --audit-level=high

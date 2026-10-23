@@ -5,13 +5,13 @@ import Chip from "@mui/material/Chip";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { motion } from "framer-motion";
-import { CSSProperties, memo, ReactNode, useId, useState } from "react";
-import { api, combinationOdds, Comparison, decimalsFor, DeckSetupBody, OddsPair, percent, percentWidth } from "../api";
+import { type CSSProperties, memo, type ReactNode, useId, useState } from "react";
+import { api, combinationOdds, type Comparison, decimalsFor, type DeckSetupBody, type OddsPair, percent, percentWidth } from "../api";
 import { exportComparison } from "../export";
-import { DeckSetup } from "../useDeckSetup";
+import type { DeckSetup } from "../useDeckSetup";
 import { Bar, deckTone, Dot, SectionHeader, Segmented, Spinner, TruncatedName } from "./common";
 import { DeckStatus } from "./DeckPanel";
-import { DeckTab } from "./DeckTabs";
+import type { DeckTab } from "./DeckTabs";
 import { ExportButton } from "./ExportButton";
 
 /** An open tab and its deck */
@@ -40,7 +40,7 @@ function deckNames(decks: [CompareDeck, CompareDeck]): [string, string] {
 
 /** Deck 2 minus deck 1; green when that favours deck 2, red when it favours deck 1. */
 function Diff({ value, digits = 1, better = null }: { value: number; digits?: number; better?: 1 | 2 | null }) {
-  if (Math.abs(value) <= 1e-10) return <span className="diff zero" aria-label="No difference">–</span>;
+  if (Math.abs(value) <= 1e-10) return <span className="diff zero"><span aria-hidden="true">–</span><span className="sr-only">No difference</span></span>;
   const tone = better === 2 ? "good" : better === 1 ? "bad" : "";
   return <span className={`diff ${tone}`}>{diffText(value, digits)}</span>;
 }

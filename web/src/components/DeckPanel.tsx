@@ -3,9 +3,9 @@
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import { motion } from "framer-motion";
-import { DragEvent, memo, useRef, useState } from "react";
+import { type DragEvent, memo, useRef, useState } from "react";
 import { CATEGORIES, CATEGORY_LABELS } from "../api";
-import { DeckSetup } from "../useDeckSetup";
+import type { DeckSetup } from "../useDeckSetup";
 import { Dot, Spinner } from "./common";
 
 export const DeckLoader = memo(function DeckLoader({ setup, onError }: { setup: DeckSetup; onError: (message: string) => void }) {
@@ -40,6 +40,7 @@ export const DeckLoader = memo(function DeckLoader({ setup, onError }: { setup: 
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: dropping a .ydk file is a shortcut for the file button and the code field
     <div className={`deck-loader ${dragging ? "dragging" : ""}`}
          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
          onDragLeave={() => setDragging(false)} onDrop={onDrop}>

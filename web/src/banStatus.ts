@@ -3,7 +3,7 @@
 // requests are gathered into one call.
 
 import { useEffect, useSyncExternalStore } from "react";
-import { api, BanStatus, DeckCard } from "./api";
+import { api, type BanStatus, type DeckCard } from "./api";
 
 const statuses = new Map<string, BanStatus>();
 const listeners = new Set<() => void>();

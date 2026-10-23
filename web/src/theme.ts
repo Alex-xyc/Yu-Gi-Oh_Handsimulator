@@ -2,7 +2,7 @@
 // Component colours can use the tag and deck colours too, e.g. <Button color="engine">.
 // All values come from the design tokens (src/design/tokens.ts).
 
-import { alpha, createTheme, PaletteColor, PaletteColorOptions, ThemeOptions } from "@mui/material/styles";
+import { alpha, createTheme, type PaletteColor, type PaletteColorOptions, type ThemeOptions } from "@mui/material/styles";
 import { colors, ease, font } from "./design/tokens";
 
 type AppColor = "engine" | "nonEngine" | "brick" | "deckA" | "deckB";

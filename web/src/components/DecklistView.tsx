@@ -11,11 +11,12 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { motion } from "framer-motion";
 import {
-  KeyboardEvent as ReactKeyboardEvent, memo, MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo,
+  type KeyboardEvent as ReactKeyboardEvent, memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo,
   useState,
 } from "react";
-import { Category, CATEGORIES, CATEGORY_LABELS, DeckCard, TagKey } from "../api";
-import { CardImage, Segmented } from "./common";
+import { type Category, CATEGORIES, CATEGORY_LABELS, type DeckCard, type TagKey } from "../api";
+import { type SortMode, sortedOrder } from "../deckSort";
+import { CardImage, Segmented, SideIcon } from "./common";
 
 /** The theme colour for each tag */
 const TAG_COLOR = { engine: "engine", non_engine: "nonEngine", brick: "brick" } as const;
@@ -54,6 +55,7 @@ export function useTagEditor({ deckList, tags, onChange, shortcuts = true }: {
   const [allCopies, setAllCopies] = useState(true);
 
   // A new deck starts a new history
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cleared when another deck is loaded
   useEffect(() => { setHistory([]); }, [deckList]);
 
   const undo = useCallback(() => {
@@ -154,38 +156,10 @@ export const TagControls = memo(function TagControls({ editor }: { editor: TagEd
   );
 });
 
-export type SortMode = "name" | "label";
-
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "name", label: "Name" },
   { value: "label", label: "Label" },
 ];
-
-/** Monsters, then spells, then traps, each by subtype; unknown cards last */
-const KIND_ORDER = [
-  "monster",
-  "spell_normal", "spell_quick_play", "spell_continuous", "spell_field", "spell_equip", "spell_ritual",
-  "trap_normal", "trap_continuous", "trap_counter",
-];
-const LABEL_ORDER: Record<Category, number> = { engine: 0, non_engine: 1, brick: 2, "": 3 };
-
-/** Deck positions sorted by name within each card type (the arrow flips the names, not the
- *  types), or by label (the arrow flips the labels; unlabelled cards stay last), then type, then name */
-function sortedOrder(mode: SortMode, descending: boolean, cards: DeckCard[] | null, deckList: string[], tags: Category[]) {
-  const kinds = new Map((cards ?? []).map((card) => [card.name, card.kind ?? ""]));
-  const kindRank = (i: number) => {
-    const rank = KIND_ORDER.indexOf(kinds.get(deckList[i]) ?? "");
-    return rank < 0 ? KIND_ORDER.length : rank;
-  };
-  const byName = (a: number, b: number) => deckList[a].localeCompare(deckList[b]) || a - b;
-  const dir = descending ? -1 : 1;
-  const unlabelled = (i: number) => (tags[i] ? 0 : 1);
-  const compare = mode === "name"
-    ? (a: number, b: number) => kindRank(a) - kindRank(b) || dir * byName(a, b)
-    : (a: number, b: number) => unlabelled(a) - unlabelled(b) || dir * (LABEL_ORDER[tags[a]] - LABEL_ORDER[tags[b]])
-      || kindRank(a) - kindRank(b) || byName(a, b);
-  return deckList.map((_, i) => i).sort(compare);
-}
 
 export interface DeckOrder {
   /** What the list is sorted by, or null once it's been rearranged since (or never sorted) */
@@ -338,10 +312,11 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
         )}
         {sided?.some(Boolean) && (
           <span className={`flex items-center gap-1.5 ${selected.size ? "" : "ml-auto"}`}>
-            <i className="side-dot static" aria-hidden="true" />Sided in
+            <SideIcon inline />Sided in
           </span>
         )}
       </div>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: mouse shortcuts for the space between cards (Escape also clears the selection, the sort buttons also order the cards) */}
       <div className={`grid select-none grid-cols-5 content-start gap-2 px-1.5 py-1.5 sm:grid-cols-10 ${scroll ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : ""}`}
            // A click on the space between cards drops the selection; dragging past the last card
            // puts the cards at the end
@@ -370,6 +345,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
             <motion.div key={index}
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(position * 0.008, 0.3) }}>
+              {/* biome-ignore lint/a11y/useSemanticElements: a <button> can't be dragged in Firefox */}
               <div role="button" tabIndex={0} draggable aria-pressed={isSelected}
                    className={`tag-tile ${tag ? `tagged tone-${tag}` : ""} ${isSelected ? "selected" : ""} ${dragging?.includes(index) ? "dragging" : ""} ${drop}`}
                    aria-label={`${name}, ${tag ? CATEGORY_LABELS[tag] : "unlabelled"}${isSided ? ", sided in" : ""}${isSelected ? ", selected" : ""}`}
@@ -411,10 +387,10 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
                 <CardImage id={idByName[name]} name={name} />
                 <span className="tile-tint" />
                 {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
-                {isSided && <i className="side-dot" aria-hidden="true" />}
+                {isSided && <SideIcon />}
                 {isSelected && (
                   <span className="tile-check" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="12" height="12">
+                    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
                       <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>

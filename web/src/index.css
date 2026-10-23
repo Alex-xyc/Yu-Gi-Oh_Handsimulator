@@ -3,9 +3,9 @@
 @layer theme, base, mui, components, utilities;
 
 @import "tailwindcss";
+@import "./styles.css" layer(components);
 /* The theme (colours, radii, fonts) and the token CSS variables, from src/design/tokens.ts */
 @config "../tailwind.config.ts";
-@import "./styles.css" layer(components);
 
 /* Page and heading defaults, in the base layer so MUI components and classes override them
    (Tailwind's reset already makes buttons inherit the font and colour) */

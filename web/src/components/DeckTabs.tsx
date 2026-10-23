@@ -29,6 +29,7 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
 
   // When the row scrolls sideways (phones), keep the open tab in view. Only the row scrolls, not
   // the page (scrollIntoView would also scroll the page up to the tabs).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run again when another tab opens or the tabs change
   useEffect(() => {
     const row = nav.current;
     const tab = row?.querySelector<HTMLElement>(".deck-tab.active");

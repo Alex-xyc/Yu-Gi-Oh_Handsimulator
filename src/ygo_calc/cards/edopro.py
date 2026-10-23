@@ -97,7 +97,12 @@ def _edopro_store_dir() -> str:
     path = os.path.join(base, 'edopro')
     if os.path.normcase(os.path.abspath(path)) == os.path.normcase(os.path.abspath(_edopro_cache_dir())):
         return ''
-    os.makedirs(path, exist_ok=True)
+    # Only an extra copy: without it the databases are just downloaded again
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        logging.exception("Can't use %s to keep EDOPro databases", path)
+        return ''
     return path
 
 

@@ -2,7 +2,7 @@
 // only loaded when an export is clicked.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { CATEGORIES, CATEGORY_LABELS, combinationOdds, Comparison, DrawResult, OddsPair, percentDigits, Stats } from "./api";
+import { CATEGORIES, CATEGORY_LABELS, combinationOdds, type Comparison, type DrawResult, type OddsPair, percentDigits, type Stats } from "./api";
 
 type Cell = string | number | null;
 /** How a column's numbers are shown */
