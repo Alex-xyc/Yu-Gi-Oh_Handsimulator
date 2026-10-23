@@ -279,10 +279,14 @@ export function AnimatedPercent({ value, digits = 1 }: { value: number; digits?:
   return <>{percent(shown, digits, percentDigits(value, digits))}</>;
 }
 
-/** A horizontal bar whose width animates to the value (0..1). */
-export function Bar({ value, tone }: { value: number; tone: string }) {
+/** The style giving a component a custom label's colour (with the "custom" tone) */
+export const toneColor = (color?: string) => (color ? { ["--tone" as string]: color } : undefined);
+
+/** A horizontal bar whose width animates to the value (0..1). `color`: a custom label's, with the
+ *  "custom" tone */
+export function Bar({ value, tone, color }: { value: number; tone: string; color?: string }) {
   return (
-    <div className="bar">
+    <div className="bar" style={toneColor(color)}>
       <motion.div className={`bar-fill tone-${tone}`} initial={false}
                   animate={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
                   transition={{ type: "spring", stiffness: 140, damping: 22 }} />
@@ -291,7 +295,7 @@ export function Bar({ value, tone }: { value: number; tone: string }) {
 }
 
 /** A colour of a label or deck, as used by the tone-* classes */
-export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side";
+export type Tone = "engine" | "non_engine" | "brick" | "deck-a" | "deck-b" | "mixed" | "untagged" | "side" | "custom";
 
 /** The tone of a deck in the comparison: side 0 is deck A (blue), side 1 deck B (pink) */
 export const deckTone = (side: number): Tone => (side ? "deck-b" : "deck-a");
@@ -321,10 +325,13 @@ export function SectionHeader({ as: Heading = "h3", title, hint, action, id }: {
   return <div className="section-header">{heading}{action}</div>;
 }
 
-/** A number with a caption under it, e.g. "40 cards"; tone adds a coloured edge */
-export function StatTile({ value, label, tone, wide = false }: { value: ReactNode; label: string; tone?: Tone; wide?: boolean }) {
+/** A number with a caption under it, e.g. "40 cards"; tone adds a coloured edge (`color` for a
+ *  custom label's) */
+export function StatTile({ value, label, tone, color, wide = false }: {
+  value: ReactNode; label: string; tone?: Tone; color?: string; wide?: boolean;
+}) {
   return (
-    <div className={`stat-tile ${tone ? `tone-${tone}` : ""} ${wide ? "wide" : ""}`}>
+    <div className={`stat-tile ${tone ? `tone-${tone}` : ""} ${wide ? "wide" : ""}`} style={toneColor(color)}>
       <span className="stat-value">{value}</span>
       <span className="muted">{label}</span>
     </div>

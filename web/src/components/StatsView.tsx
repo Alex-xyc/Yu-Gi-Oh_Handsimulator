@@ -3,8 +3,10 @@
 import { motion } from "framer-motion";
 import { memo } from "react";
 import { type CardOdds, CATEGORIES, CATEGORY_LABELS, percent, percentWidth, type Stats } from "../api";
-import { atLeast } from "../odds";
-import { AnimatedPercent, Bar, Dot, SectionHeader, SideIcon, StatTile } from "./common";
+import { atLeast, atLeastEach } from "../odds";
+import type { CustomLabelCount } from "../customLabels";
+import { MAX_COPIES } from "../useDeckSetup";
+import { AnimatedPercent, Bar, Dot, SectionHeader, StatTile } from "./common";
 
 const GROUPS: { key: CardOdds["group"]; title: string }[] = [
   { key: "engine", title: "Engine" },
@@ -44,6 +46,50 @@ export interface SidedCard {
   sided: number;
 }
 
+/** At least 1, 2, … up to the most copies a deck can have */
+const COPIES = Array.from({ length: MAX_COPIES }, (_, i) => i + 1);
+
+/** Card odds table heading: the quantity, the chance of at least 1, 2 and 3 copies going first,
+ *  the card, then the same going second (on the right, as in the opening hand odds) */
+function CopyOddsHead() {
+  const copyHeads = (side: number) => COPIES.map((n) => (
+    <th key={`${side}-${n}`} scope="col" className={n === 1 ? "odds-col-start" : ""}>
+      <abbr title={`At least ${n} ${n === 1 ? "copy" : "copies"}`}>{n}+</abbr>
+    </th>
+  ));
+  return (
+    <thead>
+      <tr>
+        <th scope="col" rowSpan={2}>Qty</th>
+        <th scope="colgroup" colSpan={COPIES.length} className="odds-col-start">Going first</th>
+        <th scope="col" rowSpan={2}>Card</th>
+        <th scope="colgroup" colSpan={COPIES.length} className="odds-col-start">Going second</th>
+      </tr>
+      <tr>{copyHeads(0)}{copyHeads(1)}</tr>
+    </thead>
+  );
+}
+
+/** One card's row: its quantity, its chance of at least 1, 2 and 3 copies going first, the card
+ *  (`children`), then the same going second ("–" for more copies than it has) */
+function CopyOddsRow({ copies, deckSize, handSize, children }: {
+  copies: number; deckSize: number; handSize: number; children: React.ReactNode;
+}) {
+  const odds = (side: number) => COPIES.map((n) => (
+    <td key={`${side}-${n}`} className={`mono ${n === 1 ? "odds-col-start" : ""} ${n > copies ? "muted" : ""}`}>
+      {n > copies ? "–" : percent(atLeast(deckSize, copies, handSize + side, n))}
+    </td>
+  ));
+  return (
+    <tr>
+      <td className="mono">{copies}×</td>
+      {odds(0)}
+      <td className="card-name">{children}</td>
+      {odds(1)}
+    </tr>
+  );
+}
+
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <motion.section className="stats-section" layout="position">
@@ -53,8 +99,13 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
-export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sidedCards = [], sidedInHand = null }: {
+export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sidedCards = [], sidedInHand = null, customLabels = [],
+  customInHand = null }: {
   stats: Stats | null; tagged: boolean; hasHand: boolean;
+  /** The custom labels (advanced mode), whose odds are shown when there are any */
+  customLabels?: CustomLabelCount[];
+  /** How many of the drawn hand's cards have each custom label (by id); null with no hand */
+  customInHand?: Record<string, number> | null;
   /** The cards with copies sided in (their odds are shown when there are any) */
   sidedCards?: SidedCard[];
   /** How many of the drawn hand's cards were sided in; null with no hand */
@@ -77,17 +128,30 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
   const valueWidth = percentWidth(CATEGORIES.flatMap((key) => [...stats.at_least[key], ...atLeastSecond[key]]));
   const grouped = tagged;
 
-  // Opening at least 1 .. 5 of the cards sided in, going first and second
+  // Opening at least 1 .. hand_size of the cards sided in going first, 1 .. hand_size + 1 going
+  // second, as in the opening hand odds (0% for more than were sided in)
   const sidedIn = sidedCards.reduce((total, card) => total + card.sided, 0);
-  const sideOdds = Array.from({ length: Math.min(5, sidedIn) }, (_, i) => ({
-    first: atLeast(stats.deck_size, sidedIn, stats.hand_size, i + 1),
-    second: atLeast(stats.deck_size, sidedIn, stats.hand_size + 1, i + 1),
-  }));
+  const sideOdds = [stats.hand_size, stats.hand_size + 1].map((cards) =>
+    Array.from({ length: cards }, (_, i) => atLeast(stats.deck_size, sidedIn, cards, i + 1)));
   // The 6th card being one of the sided-in cards still in the deck, after the current hand
   const deckRemaining = stats.deck_size - stats.hand_size;
   const sideSixth = sidedIn > 0 && sidedInHand !== null && deckRemaining > 0
     ? { remaining: sidedIn - sidedInHand, probability: (sidedIn - sidedInHand) / deckRemaining } : null;
-  const sideWidth = percentWidth(sideOdds.flatMap(({ first, second }) => [first, second]));
+  const sideWidth = percentWidth(sideOdds.flat());
+
+  // Each custom label: at least 1 .. as many as it has (no more than the hand), going first and second
+  const customOdds = customLabels.map((label) => ({
+    label,
+    first: atLeastEach(stats.deck_size, label.count, stats.hand_size),
+    second: atLeastEach(stats.deck_size, label.count, stats.hand_size + 1),
+  }));
+  const customWidth = percentWidth(customOdds.flatMap(({ first, second }) => [...first, ...second]));
+  // The 6th card having each custom label, after the current hand
+  const customSixth = customInHand && deckRemaining > 0
+    ? customLabels.filter((label) => label.count).map((label) => {
+      const remaining = label.count - (customInHand[label.id] ?? 0);
+      return { label, remaining, probability: remaining / deckRemaining };
+    }) : [];
 
   return (
     <div className="stats">
@@ -95,6 +159,9 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
         <StatTile value={stats.deck_size} label="cards" />
         {CATEGORIES.map((key) => <StatTile key={key} value={stats.counts[key]} label={CATEGORY_LABELS[key]} tone={key} />)}
         {stats.counts.untagged > 0 && <StatTile value={stats.counts.untagged} label="Untagged" />}
+        {customLabels.map((label) => (
+          <StatTile key={label.id} value={label.count} label={label.name} tone="custom" color={label.color} />
+        ))}
       </div>
 
       <Section title="Opening hand" hint="(chance of drawing X or more)">
@@ -123,6 +190,42 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
           ))}
         </div>
       </Section>
+
+      {customOdds.length > 0 && (
+        <Section title="Custom labels" hint="(chance of drawing X or more)">
+          <div className="odds-groups wide-labels" style={{ ["--value-ch" as string]: customWidth }}>
+            <div className="odds-split small muted" aria-hidden="true">
+              <span>Going first ({stats.hand_size} cards)</span>
+              <span>Going second ({stats.hand_size + 1} cards)</span>
+            </div>
+            {customOdds.map(({ label, first, second }) => (
+              label.count ? (
+                <div key={label.id} className="odds-split">
+                  {[first, second].map((odds, side) => (
+                    <div key={side} className="odds-rows"
+                         data-side={side ? `Going second (${stats.hand_size + 1} cards)` : `Going first (${stats.hand_size} cards)`}>
+                      <span className="sr-only">{side ? "Going second" : "Going first"}</span>
+                      {odds.map((p, i) => (
+                        <div key={i} className="odds-row">
+                          <span className="min-w-0 truncate" title={label.name}>{i + 1} {label.name}</span>
+                          <Bar value={p} tone="custom" color={label.color} />
+                          <span className="mono value"><AnimatedPercent value={p} /></span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div key={label.id} className="odds-rows">
+                  <span className="flex items-center small muted" style={{ ["--tone" as string]: label.color }}>
+                    <i className="dot" aria-hidden="true" />No cards labelled {label.name} yet
+                  </span>
+                </div>
+              )
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Engine × Non-Engine" hint="(exact counts in hand)">
         <div className="matrix-wrap">
@@ -160,35 +263,36 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
 
       {sidedIn > 0 && (
         <Section title="Side deck cards" hint={`(${sidedIn} sided in · chance of drawing X or more)`}>
-          {/* At least 1 up to 5 of them (no more than there are), going first (with a bar) and second */}
-          <div className="odds-rows" style={{ ["--value-ch" as string]: sideWidth }}>
-            <div className="odds-row two-values small muted" aria-hidden="true">
-              <span />{/* Where the bar is; on phones the bar has its own line */}<span className="max-[700px]:hidden" /><span className="value">First</span><span className="value">Second</span>
+          {/* Going first (left) and second (right) side by side, as in the opening hand odds */}
+          <div className="odds-groups wide-labels" style={{ ["--value-ch" as string]: sideWidth }}>
+            <div className="odds-split small muted" aria-hidden="true">
+              <span>Going first ({stats.hand_size} cards)</span>
+              <span>Going second ({stats.hand_size + 1} cards)</span>
             </div>
-            {sideOdds.map(({ first, second }, i) => (
-              <div key={i} className="odds-row two-values">
-                <span>At least {i + 1} side deck card{i ? "s" : ""}</span>
-                <Bar value={first} tone="side" />
-                <span className="mono value"><span className="sr-only">Going first: </span><AnimatedPercent value={first} /></span>
-                <span className="mono value muted"><span className="sr-only">Going second: </span><AnimatedPercent value={second} /></span>
-              </div>
-            ))}
+            <div className="odds-split">
+              {sideOdds.map((odds, side) => (
+                <div key={side} className="odds-rows"
+                     data-side={side ? `Going second (${stats.hand_size + 1} cards)` : `Going first (${stats.hand_size} cards)`}>
+                  <span className="sr-only">{side ? "Going second" : "Going first"}</span>
+                  {odds.map((p, i) => (
+                    <div key={i} className="odds-row">
+                      <span>{i + 1} side deck card{i ? "s" : ""}</span>
+                      <Bar value={p} tone="side" />
+                      <span className="mono value"><AnimatedPercent value={p} /></span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
           <table className="data-table mt-4">
-            <thead>
-              <tr><th scope="col">Qty</th><th scope="col">Going first</th><th scope="col">Going second</th><th scope="col">Card</th></tr>
-            </thead>
+            <CopyOddsHead />
             <tbody>
               {sidedCards.map((card) => (
-                <tr key={card.name}>
-                  <td className="mono">{card.copies}×</td>
-                  <td className="mono">{percent(atLeast(stats.deck_size, card.copies, stats.hand_size, 1))}</td>
-                  <td className="mono">{percent(atLeast(stats.deck_size, card.copies, stats.hand_size + 1, 1))}</td>
-                  <td className="card-name">
-                    <SideIcon inline className="mr-2" />{card.name}
-                    {card.sided < card.copies && <span className="muted small"> · {card.sided} of {card.copies} sided in</span>}
-                  </td>
-                </tr>
+                <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
+                  {card.name}
+                  {card.sided < card.copies && <span className="muted small"> · {card.sided} of {card.copies} sided in</span>}
+                </CopyOddsRow>
               ))}
             </tbody>
           </table>
@@ -196,7 +300,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
       )}
 
       <Section title="6th card" hint="(based on the current hand)">
-        {(stats.sixth_card || sideSixth) && (
+        {(stats.sixth_card || sideSixth || customSixth.length > 0) && (
           <div className="odds-rows">
             {stats.sixth_card && CATEGORIES.map((key) => (
               <div key={key} className="odds-row">
@@ -205,13 +309,17 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
                 <span className="mono value"><AnimatedPercent value={stats.sixth_card![key].probability} /></span>
               </div>
             ))}
+            {customSixth.map(({ label, remaining, probability }) => (
+              <div key={label.id} className="odds-row">
+                <span className="min-w-0 truncate" title={label.name}>{label.name} <span className="muted small">({remaining}/{deckRemaining})</span></span>
+                <Bar value={probability} tone="custom" color={label.color} />
+                <span className="mono value"><AnimatedPercent value={probability} /></span>
+              </div>
+            ))}
             {/* Shown without labels too: which cards were sided in is known either way */}
             {sideSixth && (
               <div className="odds-row">
-                <span className="flex items-center">
-                  <SideIcon inline className="mr-2" />Side deck card
-                  <span className="muted small ml-1">({sideSixth.remaining}/{deckRemaining})</span>
-                </span>
+                <span>Side deck card <span className="muted small">({sideSixth.remaining}/{deckRemaining})</span></span>
                 <Bar value={sideSixth.probability} tone="side" />
                 <span className="mono value"><AnimatedPercent value={sideSixth.probability} /></span>
               </div>
@@ -219,31 +327,26 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
           </div>
         )}
         {!stats.sixth_card && (
-          <p className={`muted small ${sideSixth ? "mt-2 mb-0" : ""}`}>
+          <p className={`muted small ${sideSixth || customSixth.length ? "mt-2 mb-0" : ""}`}>
             {!hasHand ? "Draw a hand to see these." :
-              `Label your cards in the decklist to see ${sideSixth ? "the label odds" : "these"}.`}
+              `Label your cards in the decklist to see ${sideSixth || customSixth.length ? "the engine, non-engine and brick odds" : "these"}.`}
           </p>
         )}
       </Section>
 
-      <Section title="Card odds" hint="(at least 1 copy)">
+      <Section title="Card odds" hint="(at least 1, 2 or 3 copies)">
         <table className="data-table">
-          <thead>
-            <tr><th scope="col">Qty</th><th scope="col">Going first</th><th scope="col">Going second</th><th scope="col">Card</th></tr>
-          </thead>
+          <CopyOddsHead />
           {GROUPS.map(({ key, title }) => {
             const cards = stats.cards.filter((c) => c.group === key);
             if (!cards.length) return null;
             return (
               <tbody key={key}>
-                {grouped && <tr className="group-row"><td colSpan={4}><Dot tone={key} />{title}</td></tr>}
+                {grouped && <tr className="group-row"><td colSpan={3 + 2 * COPIES.length}><Dot tone={key} />{title}</td></tr>}
                 {cards.map((card) => (
-                  <tr key={card.name}>
-                    <td className="mono">{card.copies}×</td>
-                    <td className="mono">{percent(card.first)}</td>
-                    <td className="mono">{percent(card.second)}</td>
-                    <td className="card-name">{card.name}</td>
-                  </tr>
+                  <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
+                    {card.name}
+                  </CopyOddsRow>
                 ))}
               </tbody>
             );

@@ -7,8 +7,9 @@
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
 import { CATEGORY_LABELS, type DrawnCard, type DrawResult } from "../api";
+import type { CustomLabel, CustomLabelOf } from "../customLabels";
 import { CardBack } from "./CardBack";
-import { CardImage } from "./common";
+import { CardImage, toneColor } from "./common";
 
 // Cards scale with the panel, up to about 105px wide
 const GRID = "mx-auto grid w-full max-w-[560px] grid-cols-5 gap-x-2 gap-y-4 pt-2.5 perspective-[1200px]";
@@ -36,9 +37,12 @@ function DrawLabel({ index }: { index: number }) {
   );
 }
 
-function HandCard({ card, id, index, showCategory }: {
+function HandCard({ card, id, index, showCategory, custom }: {
   card: DrawnCard; id?: string; index: number; showCategory: boolean;
+  /** Its custom label (advanced mode) */
+  custom?: CustomLabel;
 }) {
+  const category = showCategory && card.category;
   const sixth = index === 5;
   const extra = index > 5;
   // The extra draws stay face down until clicked, and a second click hides them again (a new draw
@@ -60,8 +64,13 @@ function HandCard({ card, id, index, showCategory }: {
                     transition={{ delay: extra ? 0 : 0.25 + index * 0.07, duration: 0.55, ease: [0.2, 0.7, 0.2, 1] }}>
           <div className={`${FACE} ${extra ? "opacity-75" : ""}`}>
             <CardImage id={id} name={card.name} size="full" className="h-full" />
-            {showCategory && card.category && (
-              <span className={`card-badge hand-badge tone-${card.category}`}>{CATEGORY_LABELS[card.category]}</span>
+            {category && (
+              <span className={`card-badge hand-badge tone-${category}`}>{CATEGORY_LABELS[category]}</span>
+            )}
+            {custom && (
+              <span className={`card-badge hand-badge custom-badge ${category ? "stacked" : ""}`} style={toneColor(custom.color)}>
+                {custom.name}
+              </span>
             )}
           </div>
           <div className={`${FACE} rotate-y-180`}><CardBack /></div>
@@ -88,8 +97,10 @@ function HandCard({ card, id, index, showCategory }: {
   );
 }
 
-export const HandView = memo(function HandView({ result, drawId, idByName, tagged }: {
+export const HandView = memo(function HandView({ result, drawId, idByName, tagged, customOf }: {
   result: DrawResult | null; drawId: number; idByName: Record<string, string>; tagged: boolean;
+  /** A card's custom label (advanced mode only) */
+  customOf?: CustomLabelOf;
 }) {
   if (!result) {
     return (
@@ -119,13 +130,13 @@ export const HandView = memo(function HandView({ result, drawId, idByName, tagge
   return (
     <div className={GRID} key={drawId}>
       {result.hand.map((card, i) => (
-        <HandCard key={i} card={card} id={idByName[card.name]} index={i} showCategory={tagged} />
+        <HandCard key={i} card={card} id={idByName[card.name]} index={i} showCategory={tagged} custom={customOf?.(card)} />
       ))}
       {result.sixth && (
-        <HandCard card={result.sixth} id={idByName[result.sixth.name]} index={5} showCategory={tagged} />
+        <HandCard card={result.sixth} id={idByName[result.sixth.name]} index={5} showCategory={tagged} custom={customOf?.(result.sixth)} />
       )}
       {result.draws.map((card, i) => (
-        <HandCard key={6 + i} card={card} id={idByName[card.name]} index={6 + i} showCategory={tagged} />
+        <HandCard key={6 + i} card={card} id={idByName[card.name]} index={6 + i} showCategory={tagged} custom={customOf?.(card)} />
       ))}
     </div>
   );

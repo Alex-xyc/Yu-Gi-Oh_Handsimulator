@@ -8,9 +8,11 @@ const card = (name: string, copies: number): DeckCard => ({ name, id: name.lengt
 const decks: Decks = {
   cards: [card("Ash", 2), card("Maxx", 1)],
   tags: ["engine", "engine", "brick"],
+  custom: ["", "", "custom-a"],
   sided: [false, false, false],
   side: [card("Nibiru", 2)],
   sideTags: ["", ""],
+  sideCustom: ["", ""],
   sideFromMain: [false, false],
 };
 
@@ -19,9 +21,11 @@ describe("swapCards", () => {
     expect(swapCards(decks, [2], [0])).toEqual({
       cards: [card("Ash", 2), card("Nibiru", 1)],
       tags: ["engine", "engine", ""],
+      custom: ["", "", ""],
       sided: [false, false, true],
       side: [card("Nibiru", 1), card("Maxx", 1)],
       sideTags: ["", "brick"],
+      sideCustom: ["", "custom-a"],
       sideFromMain: [false, true],
     });
   });
@@ -40,6 +44,7 @@ describe("swapCards", () => {
     const back = swapCards(swapped, [2], [1]);
     expect(back.cards).toEqual([card("Ash", 2), card("Maxx", 1)]);
     expect(back.tags).toEqual(decks.tags);
+    expect(back.custom).toEqual(decks.custom);
     expect(back.sided).toEqual([false, false, false]);
     expect(back.side).toEqual([card("Nibiru", 2)]);
     expect(back.sideFromMain).toEqual([false, false]);

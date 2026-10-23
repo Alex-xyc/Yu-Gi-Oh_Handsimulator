@@ -73,6 +73,8 @@ export interface DrawnCard {
   category: Category;
   /** Whether this copy was sided in */
   sided?: boolean;
+  /** Which copy it is: its position in the deck list (for its custom label) */
+  copy?: number;
 }
 
 export interface DrawResult {
