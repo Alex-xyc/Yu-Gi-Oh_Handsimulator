@@ -5,9 +5,9 @@
 
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Category, CATEGORY_LABELS } from "../api";
-import { DeckSetup, MAX_COPIES } from "../useDeckSetup";
-import { CardImage } from "./common";
+import { type Category, CATEGORY_LABELS } from "../api";
+import { type DeckSetup, MAX_COPIES } from "../useDeckSetup";
+import { CardImage, SideIcon } from "./common";
 
 // Cards per row: whichever gives the bigger cards
 const COLUMN_CHOICES = [10, 5];
@@ -62,7 +62,7 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
                       onClick={() => onToggle(i)}>
                 <CardImage id={idByName[name]} name={name} />
                 {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
-                {isMoved && <i className="side-dot" aria-hidden="true" />}
+                {isMoved && <SideIcon />}
                 {isPicked && <span className="side-mark" aria-hidden="true">{pick === "out" ? "OUT" : "IN"}</span>}
               </button>
             </li>
@@ -84,7 +84,7 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
   const overLimit = useMemo(() => {
     const counts = new Map<string, number>();
     deckList.forEach((name, i) => { if (!out.has(i)) counts.set(name, (counts.get(name) ?? 0) + 1); });
-    into.forEach((i) => counts.set(sideList[i], (counts.get(sideList[i]) ?? 0) + 1));
+    for (const i of into) counts.set(sideList[i], (counts.get(sideList[i]) ?? 0) + 1);
     return [...counts].find(([, copies]) => copies > MAX_COPIES)?.[0] ?? null;
   }, [deckList, sideList, out, into]);
 
@@ -121,13 +121,13 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
       const byHeight = (height / rows) * CARD_RATIO;
       return Math.max(0, Math.floor(Math.min(byWidth, byHeight)));
     };
-    const fit = () => {
+    const fitCards = () => {
       const best = COLUMN_CHOICES.reduce((a, b) => (widthFor(b) > widthFor(a) ? b : a));
       setColumns(best);
       setCardWidth(widthFor(best));
     };
-    fit();
-    const observer = new ResizeObserver(fit);
+    fitCards();
+    const observer = new ResizeObserver(fitCards);
     observer.observe(el);
     return () => observer.disconnect();
   }, [deckList.length, sideList.length]);
@@ -141,7 +141,7 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
             <span className={overLimit ? "error" : canSwap ? "ok" : ""}>{status}</span>
             {(setup.sidedIn > 0 || setup.sideFromMain.some(Boolean)) && (
               <span className="ml-3 inline-flex items-center gap-1.5 text-xs">
-                <i className="side-dot static" aria-hidden="true" />Swapped from the other deck
+                <SideIcon inline />Swapped from the other deck
               </span>
             )}
           </p>

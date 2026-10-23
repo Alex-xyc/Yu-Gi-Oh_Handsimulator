@@ -7,7 +7,7 @@
 
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { CATEGORY_LABELS, DrawnCard } from "../api";
+import { CATEGORY_LABELS, type DrawnCard } from "../api";
 import { CardImage } from "./common";
 
 const SIXTH_FRAME = "shadow-[0_0_0_2px_var(--color-sixth)]";
@@ -40,7 +40,7 @@ export function ShuffledDeckView({ deck, idByName, tagged, onClose }: {
       return Math.max(0, Math.floor(Math.min(byWidth, byHeight)));
     };
     const phone = window.matchMedia(PHONE);
-    const fit = () => {
+    const fitCards = () => {
       if (phone.matches) {
         setColumns(5);
         setCardWidth(Math.max(0, Math.floor((el.clientWidth - 4 * GAP) / 5)));
@@ -50,13 +50,13 @@ export function ShuffledDeckView({ deck, idByName, tagged, onClose }: {
       setColumns(best);
       setCardWidth(widthFor(best));
     };
-    fit();
-    const observer = new ResizeObserver(fit);
+    fitCards();
+    const observer = new ResizeObserver(fitCards);
     observer.observe(el);
-    phone.addEventListener("change", fit);
+    phone.addEventListener("change", fitCards);
     return () => {
       observer.disconnect();
-      phone.removeEventListener("change", fit);
+      phone.removeEventListener("change", fitCards);
     };
   }, [deck.length]);
 

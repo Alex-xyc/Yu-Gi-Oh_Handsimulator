@@ -4,9 +4,9 @@
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { api, DrawResult, prefetchCardImages, Stats } from "../api";
+import { api, type DrawResult, prefetchCardImages, type Stats } from "../api";
 import { exportStats } from "../export";
-import { DeckSetup } from "../useDeckSetup";
+import type { DeckSetup } from "../useDeckSetup";
 import { Overlay, SectionHeader, Spinner } from "./common";
 import { DeckLoader } from "./DeckPanel";
 import { ExportButton } from "./ExportButton";
@@ -14,7 +14,7 @@ import { SortControls, TagControls, TagGrid, TagHistoryButtons, useDeckOrder, us
 import { HandView } from "./HandView";
 import { ShuffledDeckView } from "./ShuffledDeckView";
 import { SideDeckView } from "./SideDeckView";
-import { SidedCard, StatsView } from "./StatsView";
+import { type SidedCard, StatsView } from "./StatsView";
 
 export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   setup: DeckSetup;
@@ -40,6 +40,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   const id = useId();
 
   // A new deck clears the old hand
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cleared when another deck is loaded
   useEffect(() => { setDraw(null); }, [setup.cards]);
 
   // The test hand shows full-size images and the decklist small ones: once the decklist's have had

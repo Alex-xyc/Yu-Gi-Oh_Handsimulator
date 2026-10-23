@@ -1,6 +1,6 @@
 // The open deck tabs, kept in the browser (localStorage) so a page refresh brings them back
 
-import { Category, DeckCard } from "./api";
+import type { Category, DeckCard } from "./api";
 
 const KEY = "ygo-hand-simulator:decks:v1";
 

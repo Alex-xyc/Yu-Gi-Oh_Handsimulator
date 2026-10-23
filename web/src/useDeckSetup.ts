@@ -3,9 +3,9 @@
 // and which deck it started in as it moves between the two.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, Category, DeckCard, DeckSetupBody } from "./api";
+import { api, type Category, type DeckCard, type DeckSetupBody } from "./api";
 import { rememberStatuses } from "./banStatus";
-import { SavedDeck } from "./storage";
+import type { SavedDeck } from "./storage";
 
 /** The most copies of a card a deck can have */
 export const MAX_COPIES = 3;

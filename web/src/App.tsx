@@ -1,17 +1,17 @@
 import Button from "@mui/material/Button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Overlay, Toast, Toasts } from "./components/common";
+import { Overlay, type Toast, Toasts } from "./components/common";
 import { CompareView } from "./components/CompareView";
-import { DeckTab, DeckTabs, MAX_DECKS } from "./components/DeckTabs";
+import { type DeckTab, DeckTabs, MAX_DECKS } from "./components/DeckTabs";
 import { DeckWorkspace } from "./components/DeckWorkspace";
-import { loadTabs, saveTabs, SavedTabs } from "./storage";
-import { DeckSetup, useDeckSetup } from "./useDeckSetup";
+import { loadTabs, saveTabs, type SavedTabs } from "./storage";
+import { type DeckSetup, useDeckSetup } from "./useDeckSetup";
 
 /** One deck per possible tab: a fixed number of hooks, so a tab only picks a free slot */
 function useDeckSlots(saved: SavedTabs | null): DeckSetup[] {
   const d = saved?.decks ?? {};
   const slots = [useDeckSetup(d[0]), useDeckSetup(d[1]), useDeckSetup(d[2]), useDeckSetup(d[3]), useDeckSetup(d[4]), useDeckSetup(d[5])];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the same array while every slot is the same
   return useMemo(() => slots, slots);
 }
 

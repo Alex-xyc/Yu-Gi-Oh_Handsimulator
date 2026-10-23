@@ -6,7 +6,7 @@
 
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
-import { CATEGORY_LABELS, DrawnCard, DrawResult } from "../api";
+import { CATEGORY_LABELS, type DrawnCard, type DrawResult } from "../api";
 import { CardBack } from "./CardBack";
 import { CardImage } from "./common";
 

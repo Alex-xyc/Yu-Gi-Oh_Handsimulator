@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
@@ -7,5 +7,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: { "/api": "http://127.0.0.1:8000" },
+  },
+  // Unit tests (npm test) for the logic outside the components; no browser needed
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts"],
   },
 });

@@ -2,8 +2,9 @@
 
 import { motion } from "framer-motion";
 import { memo } from "react";
-import { CardOdds, CATEGORIES, CATEGORY_LABELS, percent, percentWidth, Stats } from "../api";
-import { AnimatedPercent, Bar, Dot, SectionHeader, StatTile } from "./common";
+import { type CardOdds, CATEGORIES, CATEGORY_LABELS, percent, percentWidth, type Stats } from "../api";
+import { atLeast } from "../odds";
+import { AnimatedPercent, Bar, Dot, SectionHeader, SideIcon, StatTile } from "./common";
 
 const GROUPS: { key: CardOdds["group"]; title: string }[] = [
   { key: "engine", title: "Engine" },
@@ -34,23 +35,6 @@ function ChartIcon() {
       <motion.path d="M 84 16 L 99 16 L 99 31" stroke="var(--color-deck-b)" strokeWidth="5" {...draw(1.1)} />
     </svg>
   );
-}
-
-/** n choose k */
-function choose(n: number, k: number) {
-  if (k < 0 || k > n) return 0;
-  let result = 1;
-  for (let i = 1; i <= k; i++) result = (result * (n - k + i)) / i;
-  return result;
-}
-
-/** Chance of at least `wanted` of `copies` cards in the first `cards` of a `deckSize` deck */
-function atLeast(deckSize: number, copies: number, cards: number, wanted: number) {
-  let p = 0;
-  for (let x = wanted; x <= Math.min(copies, cards); x++) {
-    p += (choose(copies, x) * choose(deckSize - copies, cards - x)) / choose(deckSize, cards);
-  }
-  return p;
 }
 
 /** A card with copies sided in: its copies in the deck, and how many of them were sided in */
@@ -116,15 +100,16 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
       <Section title="Opening hand" hint="(chance of drawing X or more)">
         {/* Going first (left) and second (right) side by side, one block per category */}
         <div className="odds-groups" style={{ ["--value-ch" as string]: valueWidth }}>
-          <div className="odds-split small muted">
+          <div className="odds-split small muted" aria-hidden="true">
             <span>Going first ({stats.hand_size} cards)</span>
             <span>Going second ({stats.hand_size + 1} cards)</span>
           </div>
           {CATEGORIES.map((key) => (
             <div key={key} className="odds-split">
               {[stats.at_least[key], atLeastSecond[key]].map((odds, side) => (
-                <div key={side} className="odds-rows" aria-label={side ? "Going second" : "Going first"}
+                <div key={side} className="odds-rows"
                      data-side={side ? `Going second (${stats.hand_size + 1} cards)` : `Going first (${stats.hand_size} cards)`}>
+                  <span className="sr-only">{side ? "Going second" : "Going first"}</span>
                   {odds.map((p, i) => (
                     <div key={i} className="odds-row">
                       <span>{i + 1} {CATEGORY_LABELS[key].toLowerCase()}{key === "brick" && i ? "s" : ""}</span>
@@ -184,8 +169,8 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
               <div key={i} className="odds-row two-values">
                 <span>At least {i + 1} side deck card{i ? "s" : ""}</span>
                 <Bar value={first} tone="side" />
-                <span className="mono value" aria-label={`Going first ${percent(first)}`}><AnimatedPercent value={first} /></span>
-                <span className="mono value muted" aria-label={`Going second ${percent(second)}`}><AnimatedPercent value={second} /></span>
+                <span className="mono value"><span className="sr-only">Going first: </span><AnimatedPercent value={first} /></span>
+                <span className="mono value muted"><span className="sr-only">Going second: </span><AnimatedPercent value={second} /></span>
               </div>
             ))}
           </div>
@@ -200,7 +185,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
                   <td className="mono">{percent(atLeast(stats.deck_size, card.copies, stats.hand_size, 1))}</td>
                   <td className="mono">{percent(atLeast(stats.deck_size, card.copies, stats.hand_size + 1, 1))}</td>
                   <td className="card-name">
-                    <i className="side-dot static mr-2 align-middle" aria-hidden="true" />{card.name}
+                    <SideIcon inline className="mr-2" />{card.name}
                     {card.sided < card.copies && <span className="muted small"> · {card.sided} of {card.copies} sided in</span>}
                   </td>
                 </tr>
@@ -224,7 +209,7 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
             {sideSixth && (
               <div className="odds-row">
                 <span className="flex items-center">
-                  <i className="side-dot static mr-2" aria-hidden="true" />Side deck card
+                  <SideIcon inline className="mr-2" />Side deck card
                   <span className="muted small ml-1">({sideSixth.remaining}/{deckRemaining})</span>
                 </span>
                 <Bar value={sideSixth.probability} tone="side" />

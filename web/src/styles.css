@@ -265,10 +265,14 @@ table { border-collapse: collapse; width: 100%; }
 .side-tile:not(.out):not(.in):focus-visible::after { inset: -3px; border-radius: 9px; }
 .side-mark { position: absolute; top: 4px; right: 4px; padding: 0 6px; border-radius: 999px; background: var(--pick);
              color: var(--color-ink); font-size: 10px; font-weight: 800; line-height: 16px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
-/* A card that's out of the deck it started in (sided in, or sided out): a light blue dot, top left */
-.side-dot { position: absolute; top: 4px; left: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-side);
-            box-shadow: 0 0 0 1.5px rgba(5, 6, 10, 0.75), 0 0 6px var(--color-side); pointer-events: none; }
-.side-dot.static { position: static; display: inline-block; flex: none; }
+/* A card that's out of the deck it started in (sided in, or sided out): "SIDE" in the banlist
+   icons' style, in light blue, top left (the banlist icon is top right) */
+.side-icon { position: absolute; z-index: 2; top: 4%; left: 5%; width: clamp(26px, 44%, 56px); pointer-events: none;
+             filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+.side-icon svg { display: block; width: 100%; height: auto; overflow: visible; }
+.side-icon.inline { position: static; display: inline-block; flex: none; width: 30px; vertical-align: middle; filter: none; }
+.side-face { fill: #0b0b0d; stroke: var(--color-side); stroke-width: 3.5; }
+.ban-text.side-text { fill: var(--color-side); }
 .side-count { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 18px;
               background: var(--pick); color: var(--color-ink); }
 

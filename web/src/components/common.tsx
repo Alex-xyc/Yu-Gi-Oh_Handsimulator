@@ -5,9 +5,9 @@ import CircularProgress from "@mui/material/CircularProgress";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
-import { AnimatePresence, motion, Variants } from "framer-motion";
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BanStatus, cardImageUrl, loadedImages, percent, percentDigits } from "../api";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type BanStatus, cardImageUrl, loadedImages, percent, percentDigits } from "../api";
 import { useBanStatus } from "../banStatus";
 
 const IMAGE_RETRY_MS = 30_000;
@@ -43,6 +43,19 @@ function BanMark({ id }: { id?: string }) {
           )}
         </svg>
       )}
+    </span>
+  );
+}
+
+/** "SIDE" in a blue frame, in the banlist icons' style: a card that's out of the deck it started in
+ *  (sided in, or sided out). Top left on a card, or `inline` in text (a legend) */
+export function SideIcon({ inline = false, className = "" }: { inline?: boolean; className?: string }) {
+  return (
+    <span className={`side-icon ${inline ? "inline" : ""} ${className}`} aria-hidden="true">
+      <svg viewBox="0 0 52 24" aria-hidden="true">
+        <rect x="1.75" y="1.75" width="48.5" height="20.5" rx="4" className="side-face" />
+        <text x="26" y="13" className="ban-text side-text" fontSize="13.5">SIDE</text>
+      </svg>
     </span>
   );
 }
@@ -198,6 +211,7 @@ export function Segmented<T extends string | number>({ value, options, onChange,
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measured again when the selected option changes
   useLayoutEffect(() => {
     const root = box.current;
     if (!root) return;
@@ -247,13 +261,14 @@ export function Spinner() {
 /** A number that eases to its new value whenever it changes. */
 export function AnimatedPercent({ value, digits = 1 }: { value: number; digits?: number }) {
   const [shown, setShown] = useState(value);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eases from what's shown when the value changes; restarting on every frame would never finish
   useEffect(() => {
     const start = performance.now();
     const from = shown;
     let frame = 0;
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / 450);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = 1 - (1 - t) ** 3;
       setShown(from + (value - from) * eased);
       if (t < 1) frame = requestAnimationFrame(step);
     };
