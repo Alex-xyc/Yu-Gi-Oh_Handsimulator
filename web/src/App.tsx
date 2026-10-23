@@ -37,8 +37,8 @@ export default function App() {
   // Keep the open tabs and their decks and labels, so a refresh brings them back
   useEffect(() => {
     const decks = Object.fromEntries(open.map((slot) => {
-      const { cards, side, name, tags, sided, sideTags, sideFromMain } = slots[slot];
-      return [slot, { cards, side, name, tags, sided, sideTags, sideFromMain }];
+      const { cards, side, name, tags, custom, sided, sideTags, sideCustom, sideFromMain } = slots[slot];
+      return [slot, { cards, side, name, tags, custom, sided, sideTags, sideCustom, sideFromMain }];
     }));
     saveTabs({ open, active, decks });
   }, [open, active, slots]);

@@ -8,7 +8,8 @@
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { CATEGORY_LABELS, type DrawnCard } from "../api";
-import { CardImage } from "./common";
+import type { CustomLabelOf } from "../customLabels";
+import { CardImage, toneColor } from "./common";
 
 const SIXTH_FRAME = "shadow-[0_0_0_2px_var(--color-sixth)]";
 const HAND_FRAME = "shadow-[0_0_0_2px_var(--color-faint)]";
@@ -21,8 +22,11 @@ const CARD_RATIO = 59 / 86; // width / height, as .card-image
 // Phones (below Tailwind's sm breakpoint)
 const PHONE = "(max-width: 639px)";
 
-export function ShuffledDeckView({ deck, idByName, tagged, onClose }: {
-  deck: DrawnCard[]; idByName: Record<string, string>; tagged: boolean; onClose: () => void;
+export function ShuffledDeckView({ deck, idByName, tagged, customOf, onClose }: {
+  deck: DrawnCard[]; idByName: Record<string, string>; tagged: boolean;
+  /** A card's custom label (advanced mode only) */
+  customOf?: CustomLabelOf;
+  onClose: () => void;
 }) {
   const id = useId();
 
@@ -74,19 +78,28 @@ export function ShuffledDeckView({ deck, idByName, tagged, onClose }: {
       <div ref={area} className="min-h-0 flex-1 max-sm:overflow-y-auto max-sm:overscroll-contain">
         <ol className="m-0 grid list-none justify-center gap-2 p-0"
             style={{ gridTemplateColumns: `repeat(${columns}, ${cardWidth === null ? "minmax(0, 1fr)" : `${cardWidth}px`})` }}>
-          {deck.map((card, i) => (
+          {deck.map((card, i) => {
+            const category = tagged && card.category;
+            const custom = customOf?.(card);
+            return (
             <li key={i} className="flex min-w-0 flex-col gap-1">
               <div className={`relative rounded-[7px] ${i === 5 ? SIXTH_FRAME : i < 5 ? HAND_FRAME : ""}`}>
                 <CardImage id={idByName[card.name]} name={card.name} />
-                {tagged && card.category && (
-                  <span className={`card-badge tile-badge tone-${card.category}`}>{CATEGORY_LABELS[card.category]}</span>
+                {category && (
+                  <span className={`card-badge tile-badge tone-${category}`}>{CATEGORY_LABELS[category]}</span>
+                )}
+                {custom && (
+                  <span className={`card-badge tile-badge custom-badge ${category ? "stacked" : ""}`} style={toneColor(custom.color)}>
+                    {custom.name}
+                  </span>
                 )}
               </div>
               <span className="truncate text-center text-[11px] leading-4 text-muted" title={card.name}>
                 <b className={i === 5 ? "text-sixth" : "text-text"}>{i + 1}.</b> {card.name}
               </span>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </div>
     </div>

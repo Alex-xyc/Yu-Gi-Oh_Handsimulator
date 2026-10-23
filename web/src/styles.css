@@ -141,9 +141,9 @@
 .odds-groups .odds-split > * + * { padding: 0 0 0 20px; border-left: 1px solid var(--color-line); }
 /* One label width for every category, so all the bars start in line */
 .odds-split .odds-row { grid-template-columns: 7.5em minmax(40px, 1fr) auto; }
+/* Longer row labels (side deck cards, custom label names) */
+.odds-groups.wide-labels .odds-split .odds-row { grid-template-columns: minmax(0, 11em) minmax(40px, 1fr) auto; }
 /* As wide as the longest value in the section (--value-ch characters), so the bars line up */
-/* Two value columns (going first and second); the first has the bar */
-.odds-row.two-values { grid-template-columns: minmax(150px, 1fr) minmax(80px, 1.3fr) auto auto; }
 .odds-row .value { text-align: right; white-space: nowrap; min-width: max(58px, calc(var(--value-ch, 5) * 1ch)); }
 .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 65%, transparent), var(--tone));
@@ -163,6 +163,9 @@ table { border-collapse: collapse; width: 100%; }
 .data-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); }
 .data-table tbody tr:not(.group-row):hover td { background: rgba(255, 255, 255, 0.03); }
 .group-row td { padding-top: 12px; font-weight: 600; font-size: 12px; border-bottom: none; }
+/* Card odds: the going-first and going-second columns, each set off by a line */
+.data-table .odds-col-start { border-left: 1px solid var(--color-line); }
+.data-table thead th[scope="colgroup"] { border-bottom: none; padding-bottom: 0; }
 /* max-width: 0 + width: 100% lets a table cell shrink and ellipsize instead of widening the table */
 .card-name { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -240,8 +243,34 @@ table { border-collapse: collapse; width: 100%; }
 .tag-tile.tagged .tile-tint { opacity: 0.55; }
 .tile-badge { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 1px 8px; border-radius: 999px;
               font-size: 10px; max-width: calc(100% - 6px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A custom label (advanced mode) sits above the engine / non-engine / brick one */
+.tile-badge.custom-badge.stacked { bottom: 24px; }
+.hand-badge.custom-badge { overflow: hidden; text-overflow: ellipsis; padding-left: 4px; padding-right: 4px; }
+.hand-badge.custom-badge.stacked { bottom: 32px; }
 /* Ten tiles per row get narrow on smaller laptops: keep the label inside its card */
-@media (max-width: 1280px) { .tile-badge { padding: 1px 4px; font-size: 9px; } }
+@media (max-width: 1280px) {
+  .tile-badge { padding: 1px 4px; font-size: 9px; }
+  .tile-badge.custom-badge.stacked { bottom: 21px; }
+}
+
+/* Advanced labelling: one pill per label (dot, name, count); the picked one takes its colour.
+   A custom label's colour is set on the pill (--tone) */
+.label-pill { display: inline-flex; align-items: center; max-width: 100%; border: 1px solid var(--color-line); border-radius: 999px;
+              background: var(--color-surface); transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s; }
+.label-pill:hover { border-color: color-mix(in srgb, var(--tone, var(--color-accent)) 60%, var(--color-line)); }
+.label-pill.selected { background: var(--tone); border-color: var(--tone); color: var(--color-ink);
+                       box-shadow: 0 4px 16px color-mix(in srgb, var(--tone) 45%, transparent); }
+.label-pill.selected .dot { background: var(--color-ink); box-shadow: none; }
+.label-pill.editing { padding: 2px; border-radius: 12px; border-color: var(--tone); }
+.label-pill-main { display: inline-flex; align-items: center; min-width: 0; padding: 5px 12px; border: none; border-radius: 999px;
+                   background: none; color: inherit; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.label-pill-main:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.label-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-pill-count { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.label-pill-main:has(+ .label-pill-action) { padding-right: 4px; }
+.label-pill .label-pill-action { padding: 3px; color: inherit; opacity: 0.7; }
+.label-pill .label-pill-action:hover { opacity: 1; }
+.label-pill .label-pill-action:last-child { margin-right: 4px; }
 
 /* Siding: cards picked to go out of the main deck (red) or come in from the side deck (green) */
 .side-tile { position: relative; display: block; width: 100%; padding: 0; border: none; border-radius: 7px; background: none;
@@ -334,11 +363,10 @@ table { border-collapse: collapse; width: 100%; }
   .better-tag { display: none; }
   .compare-table td:not(:first-child), .compare-table th:not(:first-child) { width: 74px; }
   .odds-row { grid-template-columns: 1fr auto; }
-  .odds-row.two-values { grid-template-columns: 1fr auto auto; }
   .odds-row .bar { grid-column: 1 / -1; grid-row: 2; }
   /* Going first above going second, each block labelled */
   .odds-split { grid-template-columns: 1fr; }
-  .odds-split .odds-row { grid-template-columns: 1fr auto; }
+  .odds-split .odds-row, .odds-groups.wide-labels .odds-split .odds-row { grid-template-columns: 1fr auto; }
   .odds-split:first-child { display: none; }
   .odds-split:nth-child(2) { border-top: none; padding-top: 0; }
   .odds-groups .odds-split > * + * { padding: 12px 0 0; border-left: none; }

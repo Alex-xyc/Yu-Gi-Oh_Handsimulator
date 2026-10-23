@@ -162,24 +162,26 @@ def stats(body: DeckSetup, hand_size: int = Query(5, ge=5, le=6)):
     return opening_stats(body.pool(), hand_size=hand_size, grouped=body.tagged)
 
 
-def _drawn(cards: List[Tuple[str, str, bool]]) -> List[dict]:
-    return [{"name": name, "category": category, "sided": sided} for name, category, sided in cards]
+def _drawn(cards: List[Tuple[str, str, bool, int]]) -> List[dict]:
+    return [{"name": name, "category": category, "sided": sided, "copy": copy}
+            for name, category, sided, copy in cards]
 
 
 @app.post("/api/draw")
 def draw(body: DrawRequest):
     """Shuffle and draw 5 cards, the 6th (the next card, going second) and the 4 cards after it
     (extra draws), plus the whole shuffled deck in order; odds include the 6th-card odds for this
-    hand when the deck is tagged by card. Each card says whether it was sided in."""
+    hand when the deck is tagged by card. Each card says whether it was sided in, and which copy
+    it is (its position in the deck list), so the page can show its own labels for it."""
     setup = body.deck
     pool = list(setup.pool())
     sided = setup.sided or [False] * len(pool)
     if len(sided) != len(pool):
         raise HTTPException(400, "Sided-in cards don't match the deck.")
     # The pool is in deck order, as are the sided-in flags
-    deck = [(*pool[i], sided[i]) for i in random.sample(range(len(pool)), len(pool))]
+    deck = [(*pool[i], sided[i], i) for i in random.sample(range(len(pool)), len(pool))]
     hand, after = deck[:5], deck[5:10]
-    categories = [c for _, c, _ in hand]
+    categories = [c for _, c, _, _ in hand]
     return {
         "hand": _drawn(hand),
         "sixth": _drawn(after[:1])[0] if after else None,

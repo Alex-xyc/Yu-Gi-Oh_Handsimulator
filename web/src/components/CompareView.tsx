@@ -7,6 +7,7 @@ import Select from "@mui/material/Select";
 import { motion } from "framer-motion";
 import { type CSSProperties, memo, type ReactNode, useId, useState } from "react";
 import { api, combinationOdds, type Comparison, decimalsFor, type DeckSetupBody, type OddsPair, percent, percentWidth } from "../api";
+import { compareLabels, type CustomComparison, useLabelSettings } from "../customLabels";
 import { exportComparison } from "../export";
 import type { DeckSetup } from "../useDeckSetup";
 import { Bar, deckTone, Dot, SectionHeader, Segmented, Spinner, TruncatedName } from "./common";
@@ -56,8 +57,8 @@ function favours(diff: number, moreIsBetter: boolean | null | undefined): 1 | 2 
 
 /** Widths (in characters) for the odds rows' number columns, from their longest value, so
  * every row's bars line up however many decimals a tiny chance needs */
-function columnWidths(result: Comparison): CSSProperties {
-  const rows = [...result.odds, ...result.at_least.flatMap((group) => group.rows), ...result.bricks];
+function columnWidths(result: Comparison, extra: OddsPair[] = []): CSSProperties {
+  const rows = [...result.odds, ...result.at_least.flatMap((group) => group.rows), ...result.bricks, ...extra];
   return {
     ["--value-ch" as string]: percentWidth(rows.flatMap((row) => [row.a, row.b])),
     ["--diff-ch" as string]: Math.max(0, ...rows.map((row) => diffText((row.b - row.a) * 100).length)),
@@ -138,16 +139,20 @@ const valueRows = (rows: { label: string; a: number; b: number }[], digits: numb
     diff: <Diff value={row.b - row.a} digits={digits} better={favours(row.b - row.a, MORE_IS_BETTER[row.label])} />,
   }));
 
-function Results({ result, onExport, onError }: {
+function Results({ result, custom, onExport, onError }: {
   result: Comparison;
+  /** The custom labels in the two decks (advanced mode), as they were when compared */
+  custom: CustomComparison | null;
   onExport: () => Promise<void>;
   onError: (message: string) => void;
 }) {
   const [a, b] = result.names;
   const turn = result.hand_size === 5 ? "going first" : "going second";
+  const customGroups = custom ? compareLabels(custom, result.hand_size) : [];
   return (
     <motion.div className="compare-results" key={JSON.stringify(result.names) + result.hand_size}
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={columnWidths(result)}>
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                style={columnWidths(result, customGroups.flatMap((group) => group.rows))}>
       <div className="compare-legend">
         {result.names.map((name, side) => (
           <Chip key={side} color={side ? "deckB" : "deckA"} icon={<Dot tone={deckTone(side)} />}
@@ -161,7 +166,9 @@ function Results({ result, onExport, onError }: {
 
       <section className="stats-section">
         <SectionHeader title="Composition" action={<ExportButton onExport={onExport} onError={onError} />} />
-        <CompareTable names={result.names} rows={valueRows(result.composition, 0)} />
+        <CompareTable names={result.names} rows={valueRows([
+          ...result.composition, ...(custom?.labels ?? []).map((label) => ({ label: label.name, a: label.a, b: label.b })),
+        ], 0)} />
       </section>
 
       <section className="stats-section">
@@ -181,6 +188,22 @@ function Results({ result, onExport, onError }: {
         </div>
       </section>
 
+      {customGroups.length > 0 && (
+        <section className="stats-section">
+          <SectionHeader title="Custom labels" hint={`(chance of drawing X or more, ${turn})`} />
+          <div className="compare-groups">
+            {customGroups.map(({ label, rows }) => (
+              <div key={label.id}>
+                <h4 className="compare-group-title">
+                  <i className="dot" style={{ ["--tone" as string]: label.color }} aria-hidden="true" />{label.name}
+                </h4>
+                <OddsRows rows={rows} names={result.names} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="stats-section">
         <SectionHeader title="Bricks" hint={`(${turn})`} />
         <OddsRows rows={result.bricks} names={result.names} />
@@ -188,7 +211,7 @@ function Results({ result, onExport, onError }: {
 
       <section className="stats-section">
         <SectionHeader title="Average per hand" hint={`(${turn})`} />
-        <CompareTable names={result.names} rows={valueRows(result.averages, 2)} />
+        <CompareTable names={result.names} rows={valueRows([...result.averages, ...customGroups.map((group) => group.average)], 2)} />
       </section>
 
       <section className="stats-section">
@@ -216,6 +239,8 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
   /** The decks as they were when the result was calculated (the export recalculates from them) */
   const [resultBodies, setResultBodies] = useState<[DeckSetupBody, DeckSetupBody] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [custom, setCustom] = useState<CustomComparison | null>(null);
+  const { labels, advanced } = useLabelSettings();
   const id = useId();
 
   // A picked tab that has since been closed falls back to the first open tab not on the other side
@@ -243,8 +268,14 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
     setBusy(true);
     try {
       const pair: [DeckSetupBody, DeckSetupBody] = [bodies[0]!, bodies[1]!];
+      // The custom labels each deck has now (advanced mode), kept with the result
+      const count = (deck: CompareDeck, labelId: string) => deck.setup.custom.filter((c) => c === labelId).length;
+      const customLabels = (advanced ? labels : [])
+        .map((label) => ({ ...label, a: count(chosen[0], label.id), b: count(chosen[1], label.id) }))
+        .filter((label) => label.a || label.b);
       setResult(await api.compare(pair, size));
       setResultBodies(pair);
+      setCustom(customLabels.length ? { sizes: [chosen[0].setup.size, chosen[1].setup.size], labels: customLabels } : null);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Comparison failed.");
     } finally {
@@ -256,7 +287,7 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
   const exportBoth = async () => {
     if (!result || !resultBodies) return;
     const other = await api.compare(resultBodies, result.hand_size === 5 ? 6 : 5);
-    await exportComparison(result.hand_size === 5 ? [result, other] : [other, result]);
+    await exportComparison(result.hand_size === 5 ? [result, other] : [other, result], custom);
   };
 
   const changeHandSize = (size: number) => {
@@ -309,7 +340,7 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
       <p className="sr-only" role="status">
         {busy ? "Calculating…" : result ? `Compared ${result.names[0]} and ${result.names[1]}, ${result.hand_size === 5 ? "going first" : "going second"}.` : ""}
       </p>
-      {result ? <Results result={result} onExport={exportBoth} onError={onError} /> : (
+      {result ? <Results result={result} custom={custom} onExport={exportBoth} onError={onError} /> : (
         <p className="muted center">Pick two of your open decks, then calculate. Labels are set in each deck's tab.</p>
       )}
     </div>

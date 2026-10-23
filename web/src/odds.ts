@@ -9,6 +9,12 @@ export function choose(n: number, k: number) {
   return result;
 }
 
+/** Chance of at least 1, 2, … of `copies` cards in the first `cards` of a `deckSize` deck, up to
+ *  `max` (no more than there are copies) */
+export function atLeastEach(deckSize: number, copies: number, cards: number, max = cards) {
+  return Array.from({ length: Math.min(copies, max) }, (_, i) => atLeast(deckSize, copies, cards, i + 1));
+}
+
 /** Chance of at least `wanted` of `copies` cards in the first `cards` of a `deckSize` deck */
 export function atLeast(deckSize: number, copies: number, cards: number, wanted: number) {
   let p = 0;

@@ -10,10 +10,13 @@ export interface SavedDeck {
   side?: DeckCard[] | null;
   name: string | null;
   tags: Category[];
+  /** Per copy: its custom label's id, or "" (missing in decks saved before custom labels) */
+  custom?: string[];
   /** Per copy: whether it was sided in (missing in decks saved before it was kept) */
   sided?: boolean[];
   /** Per side deck copy: its remembered label, and whether it was sided out */
   sideTags?: Category[];
+  sideCustom?: string[];
   sideFromMain?: boolean[];
 }
 
@@ -36,11 +39,12 @@ function perCopy<T>(list: unknown, size: number, valid: (item: unknown) => boole
 }
 const isTag = (t: unknown) => TAGS.has(t as string);
 const isFlag = (f: unknown) => typeof f === "boolean";
+const isCustomId = (id: unknown) => typeof id === "string" && (id === "" || id.startsWith("custom-"));
 
 /** A saved deck as stored, or null when it isn't one (old format, edited by hand, …) */
 function validDeck(value: unknown): SavedDeck | null {
   if (!value || typeof value !== "object") return null;
-  const { cards, side, name, tags, sided, sideTags, sideFromMain } = value as Record<string, unknown>;
+  const { cards, side, name, tags, custom, sided, sideTags, sideCustom, sideFromMain } = value as Record<string, unknown>;
   if (cards === null) return { cards: null, side: [], name: null, tags: [] };
   if (!validCards(cards)) return null;
   const sizeOf = (list: DeckCard[]) => list.reduce((total, card) => total + card.copies, 0);
@@ -54,8 +58,10 @@ function validDeck(value: unknown): SavedDeck | null {
     side: sideDeck,
     name: typeof name === "string" ? name : null,
     tags: perCopy<Category>(tags, size, isTag, ""),
+    custom: perCopy<string>(custom, size, isCustomId, ""),
     sided: perCopy(sided, size, isFlag, false),
     sideTags: perCopy<Category>(sideTags, sideSize, isTag, ""),
+    sideCustom: perCopy<string>(sideCustom, sideSize, isCustomId, ""),
     sideFromMain: perCopy(sideFromMain, sideSize, isFlag, false),
   };
 }

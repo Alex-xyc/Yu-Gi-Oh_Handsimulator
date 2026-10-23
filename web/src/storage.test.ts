@@ -38,7 +38,8 @@ describe("storage", () => {
       decks: {
         0: {
           cards, side, name: "Snake-Eye", tags: ["engine", "engine", "engine", "non_engine"],
-          sided: [false, false, false, true], sideTags: ["", "brick"], sideFromMain: [false, true],
+          custom: ["custom-starter", "custom-starter", "custom-starter", ""],
+          sided: [false, false, false, true], sideTags: ["", "brick"], sideCustom: ["", ""], sideFromMain: [false, true],
         },
         2: { cards: null, side: [], name: null, tags: [] },
       },
@@ -75,8 +76,9 @@ describe("storage", () => {
     expect(loadTabs(6)?.decks[0]).toEqual({
       cards, side: null, name: null,
       tags: ["", "", "", ""],
+      custom: ["", "", "", ""],
       sided: [false, false, false, false],
-      sideTags: [], sideFromMain: [],
+      sideTags: [], sideCustom: [], sideFromMain: [],
     });
   });
 

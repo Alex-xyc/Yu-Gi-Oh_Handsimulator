@@ -126,6 +126,10 @@ class TestWebApi(unittest.TestCase):
         self.assertEqual(len(data["deck"]), 40)
         self.assertEqual(data["deck"][:5], data["hand"])
         self.assertIsNotNone(data["stats"]["sixth_card"])
+        # Every copy once, each with its own position's tag
+        self.assertEqual(sorted(card["copy"] for card in data["deck"]), list(range(40)))
+        for card in data["deck"]:
+            self.assertEqual(card["category"], tags[card["copy"]])
 
     def test_draw_marks_sided_cards(self):
         sided = [True] * 3 + [False] * 37  # the three copies of Card 100

@@ -5,6 +5,7 @@ import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { api, type DrawResult, prefetchCardImages, type Stats } from "../api";
+import { countLabels, type CustomLabelCount, type CustomLabelOf, useLabelSettings } from "../customLabels";
 import { exportStats } from "../export";
 import type { DeckSetup } from "../useDeckSetup";
 import { Overlay, SectionHeader, Spinner } from "./common";
@@ -84,18 +85,42 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
     }
   };
 
+
+  // Labelling on the page: the controls and the cards are in different panels
+  const { labels, advanced } = useLabelSettings();
+  const editor = useTagEditor({
+    deckList: setup.deckList, tags: setup.tags, custom: setup.custom, labels, advanced, onChange: setup.applyTags,
+    shortcuts: active && shortcuts && !showingDeck && !siding,
+  });
+  // Each custom label's copies in the deck, for its odds (advanced mode only)
+  const customCounts = useMemo((): CustomLabelCount[] => countLabels(advanced ? labels : [], setup.deckList, editor.custom),
+    [advanced, labels, setup.deckList, editor.custom]);
+  // A drawn card's custom label: the one its copy has now (advanced mode only)
+  const customOf = useMemo((): CustomLabelOf | undefined => {
+    if (!advanced) return undefined;
+    const byId = new Map(labels.map((label) => [label.id, label]));
+    return (card) => (card.copy === undefined ? undefined : byId.get(editor.custom[card.copy]));
+  }, [advanced, labels, editor.custom]);
+  const customInHand = useMemo(() => {
+    if (!draw || !customOf) return null;
+    const counts: Record<string, number> = {};
+    for (const card of draw.hand) {
+      const label = customOf(card);
+      if (label) counts[label.id] = (counts[label.id] ?? 0) + 1;
+    }
+    return counts;
+  }, [draw, customOf]);
+
   /** Everything the panel shows, going first and going second, plus the test hand */
   const exportAll = async () => {
     if (!stats || !body) return;
     const second = await api.stats(body, undefined, 6);
-    await exportStats({ name, first: stats, second, draw, labelled: setup.labelled });
+    await exportStats({
+      name, first: stats, second, draw, labelled: setup.labelled, sidedCards,
+      customLabels: customCounts, customOf, customInHand,
+    });
   };
 
-  // Labelling on the page: the controls and the cards are in different panels
-  const editor = useTagEditor({
-    deckList: setup.deckList, tags: setup.tags, onChange: setup.applyTags,
-    shortcuts: active && shortcuts && !showingDeck && !siding,
-  });
   // The cards with copies sided in, in deck order, for their odds
   const sidedCards = useMemo((): SidedCard[] => (setup.cards ?? []).flatMap((card) => {
     const start = setup.deckList.indexOf(card.name);
@@ -133,7 +158,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
                 </Button>
               </div>
             } />
-            <HandView result={draw} drawId={drawId} idByName={setup.idByName} tagged={setup.labelled} />
+            <HandView result={draw} drawId={drawId} idByName={setup.idByName} tagged={setup.labelled} customOf={customOf} />
           </div>
         </section>
 
@@ -166,7 +191,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
       </div>
 
       <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label="Shuffled deck" asWindow fit>
-        {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} onClose={closeDeck} />}
+        {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} customOf={customOf} onClose={closeDeck} />}
       </Overlay>
 
       <Overlay open={siding && setup.cards !== null} onClose={closeSide} label="Side deck" asWindow fit>
@@ -177,6 +202,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
         <SectionHeader as="h2" id={`${id}-stats`} title="Probabilities"
                        action={<ExportButton disabled={!stats} onError={onError} onExport={exportAll} />} />
         <StatsView stats={stats} tagged={setup.labelled} hasHand={draw !== null} sidedCards={sidedCards}
+                   customLabels={customCounts} customInHand={customInHand}
                    sidedInHand={draw ? draw.hand.filter((card) => card.sided).length : null} />
       </section>
     </main>
