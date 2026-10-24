@@ -1,5 +1,6 @@
 # Deploys the web app to the VPS once CI has passed on main: builds the image, pushes it to the
 # GitHub Container Registry (ghcr.io), then over SSH has the server pull it and restart (deploy/compose.yaml).
+# If the new build doesn't come up healthy, the server goes back to the build it ran before.
 # Needs, under Settings > Secrets and variables > Actions (see README "Deploy on a VPS"):
 #   secrets   VPS_SSH_KEY (the deploy key's private half), VPS_SSH_KNOWN_HOSTS (ssh-keyscan of the server)
 #   variables VPS_HOST (the server's address), VPS_USER (the deploy user), DOMAIN (the site's domain)
@@ -17,22 +18,30 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+env:
+  TAG: ${{ github.event.workflow_run.head_sha }}
+
 jobs:
-  deploy:
+  # Two jobs, so the token handed to the server (in deploy) can only pull images: the one that
+  # can push them stays here, on GitHub's runner
+  build:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # pushes the image to ghcr.io, and lets the server pull it during this job
-    env:
-      VPS_HOST: ${{ vars.VPS_HOST }}
-      VPS_USER: ${{ vars.VPS_USER }}
-      DOMAIN: ${{ vars.DOMAIN }}
-      SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-      KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-      TAG: ${{ github.event.workflow_run.head_sha }}
+      packages: write   # pushes the image to ghcr.io
+    outputs:
+      image: ${{ steps.settings.outputs.image }}
     steps:
+      # Before building, so a missing setting fails the run straight away
       - name: Check the server settings
+        id: settings
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
+          DOMAIN: ${{ vars.DOMAIN }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           missing=0
           # Each setting by its name in the env block, then as GitHub knows it
@@ -46,7 +55,7 @@ jobs:
           done
           if [ "$missing" = 1 ]; then exit 1; fi
           # ghcr.io wants the owner in lower case
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ygo-calc" >> "$GITHUB_ENV"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ygo-calc" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the tested commit
         uses: actions/checkout@v4
@@ -69,12 +78,32 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ env.TAG }}
-            ${{ env.IMAGE }}:latest
+            ${{ steps.settings.outputs.image }}:${{ env.TAG }}
+            ${{ steps.settings.outputs.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read    # lets the server pull the image during this job, and nothing more
+    env:
+      VPS_HOST: ${{ vars.VPS_HOST }}
+      VPS_USER: ${{ vars.VPS_USER }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      IMAGE: ${{ needs.build.outputs.image }}
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
       - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
@@ -88,9 +117,18 @@ jobs:
             StrictHostKeyChecking yes
           EOF
 
+      # The build running now, to go back to if the new one fails (none on the first deploy)
+      - name: Note the running build
+        id: previous
+        run: |
+          tag=$(ssh vps 'sed -n "s/^IMAGE_TAG=//p" ~/ygo-calc/.env 2>/dev/null' || true)
+          # Only a commit hash: the value goes into a shell command below
+          if [[ "$tag" =~ ^[0-9a-f]{40}$ ]]; then echo "tag=$tag" >> "$GITHUB_OUTPUT"; fi
+
       # The server gets compose.yaml, the Caddyfile and an .env naming this build, so `docker
       # compose` run there by hand works on the same settings. It signs in to ghcr.io with this
-      # job's token (valid only while the job runs) to pull the image, then signs out again.
+      # job's token (valid only while the job runs, and only for pulling) to pull the image, then
+      # signs out again. --wait fails the step if the app doesn't become healthy (see the Dockerfile).
       - name: Deploy to the server
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,8 +141,24 @@ jobs:
             cd ~/ygo-calc
             trap "docker logout ghcr.io" EXIT
             docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f'
+            docker compose up -d --remove-orphans --wait --wait-timeout 120'
 
       - name: Check the site is up
         run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors -o /dev/null "https://$DOMAIN/"
+
+      # Only once the new build is known to work, so the previous image is still on the server for
+      # a rollback. Keeps two weeks of builds for rolling back by hand (IMAGE_TAG=<commit>).
+      - name: Remove old images
+        run: ssh vps 'docker image prune -af --filter "until=336h"'
+
+      # The image is still on the server (old ones are only removed after a good deploy), so no
+      # sign-in is needed. The run stays failed, so the broken build gets noticed.
+      - name: Roll back to the previous build
+        if: failure() && steps.previous.outputs.tag != ''
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          echo "::error::Build $TAG didn't come up; going back to $PREVIOUS_TAG."
+          printf 'DOMAIN=%s\nIMAGE=%s\nIMAGE_TAG=%s\n' "$DOMAIN" "$IMAGE" "$PREVIOUS_TAG" | ssh vps 'cat > ~/ygo-calc/.env'
+          ssh vps 'cd ~/ygo-calc && docker compose up -d --remove-orphans --wait --wait-timeout 120'
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors -o /dev/null "https://$DOMAIN/"

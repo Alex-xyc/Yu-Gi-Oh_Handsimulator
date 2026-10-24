@@ -178,5 +178,33 @@ class TestWebApi(unittest.TestCase):
         self.assertEqual(self.client.get("/api/cards/abc/image").status_code, 404)
 
 
+@unittest.skipIf(TestClient is None, "fastapi is not installed")
+class TestWebFiles(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from fastapi import FastAPI
+        from ygo_calc.web.server import WebFiles
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        os.makedirs(os.path.join(folder.name, "assets"))
+        for name in ("index.html", os.path.join("assets", "index-abc123.js")):
+            with open(os.path.join(folder.name, name), "w", encoding="utf-8") as f:
+                f.write("x")
+        app = FastAPI()
+        app.mount("/", WebFiles(directory=folder.name, html=True))
+        self.client = TestClient(app)
+
+    def test_page_is_revalidated(self):
+        self.assertEqual(self.client.get("/").headers["cache-control"], "no-cache")
+
+    def test_hashed_assets_are_kept(self):
+        self.assertIn("immutable", self.client.get("/assets/index-abc123.js").headers["cache-control"])
+
+    def test_missing_file_is_not_cached(self):
+        response = self.client.get("/assets/old.js")
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("cache-control", response.headers)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -215,5 +215,18 @@ async def card_image(card_id: str, size: Literal["small", "full"] = "small"):
     return Response(image, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000, immutable"})
 
 
+class WebFiles(StaticFiles):
+    """The built front end. Files under assets/ have a content hash in their name, so browsers may
+    keep them for good; everything else (index.html above all) is checked with the server on each
+    use, so a page loaded after a deploy never asks for the old build's assets, which are gone."""
+
+    async def get_response(self, path: str, scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            hashed = path.replace(os.sep, "/").startswith("assets/")
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if hashed else "no-cache"
+        return response
+
+
 if os.path.isdir(WEB_DIST):
-    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+    app.mount("/", WebFiles(directory=WEB_DIST, html=True), name="web")

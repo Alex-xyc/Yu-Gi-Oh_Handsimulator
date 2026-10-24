@@ -140,8 +140,10 @@ Card images and the EDOPro databases are kept in a Docker volume across deploys.
    answers.
 
 On the server (`ssh deploy@<server-ip>`, then `cd ygo-calc`): `docker compose logs -f web` for
-the server log, `docker compose ps` for what's running. To roll back, re-run an earlier Deploy
-workflow, or run `IMAGE_TAG=<commit> docker compose up -d` there.
+the server log, `docker compose ps` for what's running. A deploy whose build doesn't come up
+healthy goes back to the previous build by itself (the run still shows as failed). To roll back by
+hand, re-run an earlier Deploy workflow, or run `IMAGE_TAG=<commit> docker compose up -d` there:
+the server keeps two weeks of builds.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_IMAGE_MEMORY_MB` (recently served
