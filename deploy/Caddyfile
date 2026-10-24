@@ -1,0 +1,6 @@
+# HTTPS for the site: Caddy gets and renews a Let's Encrypt certificate for $DOMAIN by itself
+# (the domain's DNS must point at the server, and ports 80 and 443 be open), and redirects HTTP to HTTPS.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8000
+}

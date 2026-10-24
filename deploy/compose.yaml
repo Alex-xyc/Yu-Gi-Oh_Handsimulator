@@ -1,0 +1,45 @@
+# The web app on the VPS, behind Caddy (HTTPS). The Deploy workflow copies this folder to
+# ~/ygo-calc on the server, writes .env there (DOMAIN, IMAGE, IMAGE_TAG) and starts it. By hand, on the server:
+#   cd ~/ygo-calc
+#   docker compose ps                       what's running
+#   docker compose logs -f web              follow the server log
+#   IMAGE_TAG=<commit> docker compose up -d roll back to an earlier build (any commit Deploy pushed)
+
+services:
+  web:
+    image: ${IMAGE:-ghcr.io/alex-xyc/ygo-calc}:${IMAGE_TAG:-latest}
+    container_name: ygo-calc
+    # No published ports: only Caddy reaches the app, over the compose network
+    environment:
+      # Caddy is the one proxy in front of the app, so the rate limits go by the address it
+      # appends to X-Forwarded-For (see src/ygo_calc/web/security.py)
+      YGO_PROXY_HOPS: "1"
+    volumes:
+      # Card images and EDOPro card databases, kept across deploys
+      - ygo-cache:/cache
+    restart: unless-stopped
+
+  caddy:
+    # Pinned by digest like the Dockerfile's images. To update:
+    #   docker buildx imagetools inspect caddy:2-alpine
+    image: caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    container_name: ygo-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to the site's domain}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The HTTPS certificates; keep them, or Let's Encrypt's rate limits can bite after a few redeploys
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  ygo-cache:
+  caddy-data:
+  caddy-config:

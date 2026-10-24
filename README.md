@@ -53,7 +53,7 @@ web/                      The web front end (React + TypeScript, Vite)
   src/components/           Deck loading, hand, statistics, tagging and compare views
 tests/                    Unit tests (python -m unittest discover -s tests)
 Dockerfile  compose.yaml  Builds and runs the web app with Docker
-cloudrun-setup.sh         One-time Google Cloud setup for the Cloud Run deploy
+deploy/                   The VPS deploy: the app behind Caddy (HTTPS), used by the Deploy workflow
 ```
 
 Quick start
@@ -97,26 +97,43 @@ docker compose logs -f           # server log
 docker compose down              # stop (the image cache volume is kept)
 ```
 
-Deploy on Google Cloud Run: the Deploy workflow (`.github/workflows/deploy.yml`) builds the
-image and deploys it whenever CI passes on `main`. The service scales to zero when idle (the
-first visit after a quiet spell takes a few seconds), runs at most one instance (the rate
-limits are per process), and keeps card images and a copy of the EDOPro card databases in a
-Cloud Storage bucket mounted at `/cache`, so neither is downloaded again after a restart.
-At hobby traffic this costs nothing or a few cents a month. One-time setup:
+Deploy on a VPS (Hostinger or any Linux server with Docker): the Deploy workflow
+(`.github/workflows/deploy.yml`) runs whenever CI passes on `main`. It builds the image, pushes
+it to the GitHub Container Registry (`ghcr.io/<owner>/ygo-calc`, tagged with the commit and
+`latest`), then over SSH copies `deploy/` to `~/ygo-calc` on the server and restarts the app
+there with the new image. Caddy sits in front of it and gets the HTTPS certificate by itself.
+Card images and the EDOPro databases are kept in a Docker volume across deploys. One-time setup:
 
-1. Create a project at https://console.cloud.google.com and link a billing account (a card
-   is required even for free usage). Consider adding a budget alert under Billing > Budgets.
-2. Open Cloud Shell (the `>_` button), upload `cloudrun-setup.sh` and run it:
-   `bash cloudrun-setup.sh <project-id>` (it defaults to region `europe-west1`; set `REGION=...`
-   to change that).
-3. Add the four repository variables it prints in GitHub (Settings > Secrets and variables >
-   Actions > Variables).
-4. Push to `main`, or re-run the latest Deploy workflow. The log prints the site's URL
-   (`https://ygo-calc-....run.app`).
+1. Create the VPS with Ubuntu 24.04 (Hostinger hPanel > VPS) and note its IP address. At your
+   domain's DNS, add an `A` record (and `AAAA` for IPv6) pointing the domain at it. If the DNS is
+   on Cloudflare, leave the record "DNS only": its proxy would be a second hop in front of the app.
+2. On the server, as root (hPanel shows the SSH login):
 
-Server log: `gcloud run services logs read ygo-calc --region europe-west1`. A custom domain
-can be added with `gcloud beta run domain-mappings create --service ygo-calc --domain <domain>
---region europe-west1` plus the DNS records it prints.
+   ```bash
+   apt update && apt upgrade -y
+   curl -fsSL https://get.docker.com | sh       # Docker and the compose plugin
+   adduser --disabled-password --gecos "" deploy && usermod -aG docker deploy
+   mkdir -p /home/deploy/.ssh && chmod 700 /home/deploy/.ssh
+   ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
+   ```
+
+3. On your own computer, make a key only for deploying, and let it in as `deploy`:
+
+   ```bash
+   ssh-keygen -t ed25519 -f ygo-deploy -N "" -C github-deploy
+   ssh root@<server-ip> "cat >> /home/deploy/.ssh/authorized_keys && chown -R deploy:deploy /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys" < ygo-deploy.pub
+   ssh-keyscan <server-ip>                       # the server's host keys, for VPS_SSH_KNOWN_HOSTS
+   ```
+
+4. In GitHub (Settings > Secrets and variables > Actions), add the secrets `VPS_SSH_KEY` (the
+   whole contents of `ygo-deploy`) and `VPS_SSH_KNOWN_HOSTS` (the `ssh-keyscan` output), and the
+   variables `VPS_HOST` (the server's IP), `VPS_USER` (`deploy`) and `DOMAIN` (e.g. `ygo.example.com`).
+5. Push to `main`, or re-run the latest Deploy workflow. It ends by checking `https://<domain>/`
+   answers.
+
+On the server (`ssh deploy@<server-ip>`, then `cd ygo-calc`): `docker compose logs -f web` for
+the server log, `docker compose ps` for what's running. To roll back, re-run an earlier Deploy
+workflow, or run `IMAGE_TAG=<commit> docker compose up -d` there.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_IMAGE_MEMORY_MB` (recently served
@@ -129,7 +146,7 @@ Content-Security-Policy, no framing, no MIME sniffing), request bodies are limit
 and each client is rate limited per minute (30 deck lookups, 600 card images, 300 other API
 calls); a client that carries on at twice its limit is blocked for 10 minutes. Behind a reverse
 proxy or hosting platform, set `YGO_PROXY_HOPS` to the number of proxies in front of the app (the
-Cloud Run deploy sets 1) so the limits apply to each real visitor rather than to the proxy; the
+VPS deploy sets 1, for Caddy) so the limits apply to each real visitor rather than to the proxy; the
 app then reads the address the proxy appended to X-Forwarded-For, which visitors can't fake.
 Requests to the card sites are throttled whoever asks for them (at most 10 a second and 300 a
 minute per site, 4 at a time), a site that answers 429 or keeps failing is left alone for a
