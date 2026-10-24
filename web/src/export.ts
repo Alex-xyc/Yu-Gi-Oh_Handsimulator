@@ -2,9 +2,13 @@
 // only loaded when an export is clicked.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { CATEGORIES, CATEGORY_LABELS, combinationOdds, type Comparison, type DrawnCard, type DrawResult, type OddsPair, percentDigits, type Stats } from "./api";
+import { CATEGORIES, combinationOdds, type Comparison, type DrawnCard, type DrawResult, type OddsPair, percentDigits, type Stats } from "./api";
 import { type CustomComparison, compareLabels, type CustomLabelCount, type CustomLabelOf } from "./customLabels";
+import i18n from "./i18n";
 import { atLeastEach, atLeast as chanceOfAtLeast } from "./odds";
+
+// In the language at the time of the export
+const { t } = i18n;
 
 type Cell = string | number | null;
 /** How a column's numbers are shown */
@@ -60,13 +64,13 @@ function fitColumns(sheet: Worksheet) {
 async function newWorkbook(): Promise<Workbook> {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Yu-Gi-Oh! Hand Simulator";
+  workbook.creator = t("app.name");
   workbook.created = new Date();
   return workbook;
 }
 
 /** A name that's safe as a file name */
-const fileSafe = (name: string) => name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "deck";
+const fileSafe = (name: string) => name.replace(/[\\/:*?"<>|]+/g, "_").trim() || t("export.defaultFileName");
 
 async function download(workbook: Workbook, fileName: string) {
   workbook.worksheets.forEach(fitColumns);
@@ -82,12 +86,9 @@ async function download(workbook: Workbook, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Card groups as the Probabilities panel shows them */
-const GROUP_LABELS: Record<string, string> = { ...CATEGORY_LABELS, mixed: "Mixed tags", untagged: "Untagged" };
-
 /** Card odds columns: at least 1, 2 and 3 copies, going first then going second */
-const COPY_HEADERS = ["first", "second"].flatMap((turn) => [1, 2, 3].map((n) => `${n}+ going ${turn}`));
-const COPY_FORMATS: Format[] = COPY_HEADERS.map(() => "percent");
+const copyHeaders = () => (["export.copyFirst", "export.copySecond"] as const).flatMap((key) => [1, 2, 3].map((n) => t(key, { count: n })));
+const COPY_FORMATS: Format[] = Array<Format>(6).fill("percent");
 /** A card's chance of at least 1, 2 and 3 copies going first and second (none for more than it has) */
 const copyOdds = (deckSize: number, copies: number): Cell[] =>
   [5, 6].flatMap((cards) => [1, 2, 3].map((n) => (n > copies ? null : chanceOfAtLeast(deckSize, copies, cards, n))));
@@ -98,7 +99,7 @@ interface SidedCard { name: string; copies: number; sided: number }
 /** "At least 1 …" up to as many as there are (no more than 6 cards), going first and second */
 function atLeastRows(label: string, deckSize: number, copies: number): Cell[][] {
   const first = atLeastEach(deckSize, copies, 5);
-  return atLeastEach(deckSize, copies, 6).map((p2, i) => [`At least ${i + 1} ${label}`, first[i] ?? null, p2]);
+  return atLeastEach(deckSize, copies, 6).map((p2, i) => [t("common.atLeastLabel", { count: i + 1, name: label }), first[i] ?? null, p2]);
 }
 
 /** One deck's statistics: everything its Probabilities panel shows, going first (5 cards) and
@@ -121,82 +122,83 @@ export async function exportStats({ name, first, second, draw, labelled, sidedCa
   customInHand?: Record<string, number> | null;
 }) {
   const workbook = await newWorkbook();
-  const sheet = workbook.addWorksheet("Probabilities");
-  const both = ["", "Going first", "Going second"];
+  const sheet = workbook.addWorksheet(t("export.probabilitiesSheet"));
+  const both = ["", t("common.goingFirst"), t("common.goingSecond")];
   const pct: Format[] = ["text", "percent", "percent"];
+  const copyColumns = copyHeaders();
 
   sheet.getCell(1, 1).value = name;
   sheet.getCell(1, 1).font = { bold: true, size: 15 };
-  sheet.getCell(2, 1).value = `Exported ${new Date().toLocaleString()} · going first = 5-card hand, going second = 6 cards`;
+  sheet.getCell(2, 1).value = t("export.exportedAt", { date: new Date().toLocaleString(i18n.language) });
   sheet.getCell(2, 1).font = { italic: true, color: { argb: "FF6B7280" } };
 
-  let row = addTable(sheet, 4, "Composition", ["", "Cards"], ["text", "number"], [
-    ["Deck size", first.deck_size],
-    ...CATEGORIES.map((key): Cell[] => [CATEGORY_LABELS[key], first.counts[key]]),
-    ["Untagged", first.counts.untagged],
-    ...customLabels.map((label): Cell[] => [`${label.name} (custom label)`, label.count]),
-    ...(sidedCards.length ? [["Sided in", sidedCards.reduce((total, card) => total + card.sided, 0)] as Cell[]] : []),
+  let row = addTable(sheet, 4, t("export.composition"), ["", t("export.cards")], ["text", "number"], [
+    [t("export.deckSize"), first.deck_size],
+    ...CATEGORIES.map((key): Cell[] => [t(`categories.${key}`), first.counts[key]]),
+    [t("categories.untagged"), first.counts.untagged],
+    ...customLabels.map((label): Cell[] => [t("export.customLabelRow", { name: label.name }), label.count]),
+    ...(sidedCards.length ? [[t("export.sidedIn"), sidedCards.reduce((total, card) => total + card.sided, 0)] as Cell[]] : []),
   ]);
 
   // Chance of drawing X or more: 1..5 going first, 1..6 going second
   const atLeast = CATEGORIES.flatMap((key) =>
     second.at_least[key].map((p2, i): Cell[] => [
-      `At least ${i + 1} ${CATEGORY_LABELS[key].toLowerCase()}`, first.at_least[key][i] ?? null, p2,
+      t(`export.atLeast.${key}`, { count: i + 1 }), first.at_least[key][i] ?? null, p2,
     ]));
-  row = addTable(sheet, row, "Opening hand (chance of drawing X or more)", both, pct, atLeast);
+  row = addTable(sheet, row, t("export.openingHandXOrMore"), both, pct, atLeast);
 
   if (customLabels.length) {
-    row = addTable(sheet, row, "Custom labels (chance of drawing X or more)", both, pct, customLabels.flatMap((label) =>
-      label.count ? atLeastRows(label.name, first.deck_size, label.count) : [[`${label.name}: no cards labelled`, null, null]]));
+    row = addTable(sheet, row, t("export.customXOrMore"), both, pct, customLabels.flatMap((label) =>
+      label.count ? atLeastRows(label.name, first.deck_size, label.count) : [[t("export.noCardsLabelled", { name: label.name }), null, null]]));
   }
 
-  row = addTable(sheet, row, "Opening hand combinations", both, pct,
+  row = addTable(sheet, row, t("export.combinations"), both, pct,
     first.combinations.map((c, i) => [c.label, c.probability, second.combinations[i]?.probability ?? null]));
 
-  row = addTable(sheet, row, "Average per hand", both, ["text", "decimal", "decimal"],
-    CATEGORIES.map((key) => [CATEGORY_LABELS[key], first.averages[key], second.averages[key]]));
+  row = addTable(sheet, row, t("export.averagePerHand"), both, ["text", "decimal", "decimal"],
+    CATEGORIES.map((key) => [t(`categories.${key}`), first.averages[key], second.averages[key]]));
 
-  row = addTable(sheet, row, "Bricks", both, pct, [
-    ["Open with a brick", first.bricks.open, second.bricks.open],
-    ["Draw one as the next card (6th / 7th)", first.bricks.draw_sixth, second.bricks.draw_sixth],
-    ["See one by the next draw (6 / 7 cards)", first.bricks.by_turn_one, second.bricks.by_turn_one],
+  row = addTable(sheet, row, t("export.bricks"), both, pct, [
+    [t("export.openWithBrick"), first.bricks.open, second.bricks.open],
+    [t("export.drawBrickNext"), first.bricks.draw_sixth, second.bricks.draw_sixth],
+    [t("export.brickByNextDraw"), first.bricks.by_turn_one, second.bricks.by_turn_one],
   ]);
 
   // The cards sided in: 1 .. 5 of them going first, 1 .. 6 going second (as the panel shows), and each card
   const sidedIn = sidedCards.reduce((total, card) => total + card.sided, 0);
   if (sidedIn) {
-    row = addTable(sheet, row, `Side deck cards (${sidedIn} sided in · chance of drawing X or more)`, both, pct,
+    row = addTable(sheet, row, t("export.sideDeckXOrMore", { count: sidedIn }), both, pct,
       [1, 2, 3, 4, 5, 6].map((n): Cell[] => [
-        `${n} side deck card${n > 1 ? "s" : ""}`,
+        t("stats.sideDeckRow", { count: n }),
         n <= 5 ? chanceOfAtLeast(first.deck_size, sidedIn, 5, n) : null, chanceOfAtLeast(first.deck_size, sidedIn, 6, n),
       ]));
-    row = addTable(sheet, row, "Side deck cards (at least 1, 2 or 3 copies)", ["Card", "Qty", "Sided in", ...COPY_HEADERS],
+    row = addTable(sheet, row, t("export.sideDeckCopies"), [t("export.card"), t("export.qty"), t("export.sidedIn"), ...copyColumns],
       ["text", "number", "number", ...COPY_FORMATS],
       sidedCards.map((card) => [card.name, card.copies, card.sided, ...copyOdds(first.deck_size, card.copies)]));
   }
 
   // The Engine × Non-Engine table, once per hand size
-  for (const [stats, label] of [[first, "going first"], [second, "going second"]] as const) {
-    row = addTable(sheet, row, `Engine × Non-Engine, exact counts in hand (${label})`,
-      ["Engine \\ Non-engine", ...stats.matrix[0].map((_, ne) => `${ne} NE`)],
+  for (const [stats, turn] of [[first, t("common.turnFirst")], [second, t("common.turnSecond")]] as const) {
+    row = addTable(sheet, row, t("export.matrix", { turn }),
+      [t("export.matrixCorner"), ...stats.matrix[0].map((_, ne) => t("stats.nonEngineShort", { count: ne }))],
       ["text", ...stats.matrix[0].map((): Format => "percent")],
-      stats.matrix.map((cells, e) => [`${e} E`, ...cells]));
+      stats.matrix.map((cells, e) => [t("stats.engineShort", { count: e }), ...cells]));
   }
 
   if (draw) {
     const hasCustom = customLabels.length > 0;
     const hasSided = draw.deck.some((card) => card.sided);
     const describe = (title: string, card: DrawnCard): Cell[] => [
-      title, card.category ? CATEGORY_LABELS[card.category] : "",
+      title, card.category ? t(`categories.${card.category}`) : "",
       ...(hasCustom ? [customOf?.(card)?.name ?? ""] : []),
-      ...(hasSided ? [card.sided ? "Yes" : ""] : []),
+      ...(hasSided ? [card.sided ? t("export.yes") : ""] : []),
     ];
-    row = addTable(sheet, row, "Test hand",
-      ["Card", "Label", ...(hasCustom ? ["Custom label"] : []), ...(hasSided ? ["Sided in"] : [])],
+    row = addTable(sheet, row, t("export.testHand"),
+      [t("export.card"), t("export.label"), ...(hasCustom ? [t("export.customLabel")] : []), ...(hasSided ? [t("export.sidedIn")] : [])],
       ["text", "text", "text", "text"], [
         ...draw.hand.map((card) => describe(card.name, card)),
-        ...(draw.sixth ? [describe(`6th card: ${draw.sixth.name}`, draw.sixth)] : []),
-        ...draw.draws.map((card, i) => describe(`Draw ${i + 7}: ${card.name}`, card)),
+        ...(draw.sixth ? [describe(t("export.sixthCardNamed", { name: draw.sixth.name }), draw.sixth)] : []),
+        ...draw.draws.map((card, i) => describe(t("export.drawNamed", { number: i + 7, name: card.name }), card)),
       ]);
 
     // The 6th card's odds after this hand: each label, each custom label and the cards sided in
@@ -204,15 +206,15 @@ export async function exportStats({ name, first, second, draw, labelled, sidedCa
     const deckRemaining = first.deck_size - first.hand_size;
     const sidedInHand = draw.hand.filter((card) => card.sided).length;
     const sixthRows: Cell[][] = deckRemaining > 0 ? [
-      ...(sixth ? CATEGORIES.map((key): Cell[] => [CATEGORY_LABELS[key], sixth[key].remaining, sixth[key].probability]) : []),
+      ...(sixth ? CATEGORIES.map((key): Cell[] => [t(`categories.${key}`), sixth[key].remaining, sixth[key].probability]) : []),
       ...customLabels.filter((label) => label.count).map((label): Cell[] => {
         const remaining = label.count - (customInHand?.[label.id] ?? 0);
         return [label.name, remaining, remaining / deckRemaining];
       }),
-      ...(sidedIn ? [["Side deck card", sidedIn - sidedInHand, (sidedIn - sidedInHand) / deckRemaining] as Cell[]] : []),
+      ...(sidedIn ? [[t("export.sideDeckCard"), sidedIn - sidedInHand, (sidedIn - sidedInHand) / deckRemaining] as Cell[]] : []),
     ] : [];
     if (sixthRows.length) {
-      row = addTable(sheet, row, "6th card (based on the test hand)", ["", "Left in deck", "Chance"],
+      row = addTable(sheet, row, t("export.sixthCard"), ["", t("export.leftInDeck"), t("export.chance")],
         ["text", "number", "percent"], sixthRows);
     }
   }
@@ -220,62 +222,63 @@ export async function exportStats({ name, first, second, draw, labelled, sidedCa
   // Each card's custom labels (its copies can differ)
   const cardCustom = (name: string) => [...new Set(customLabels.flatMap((label) => label.cards?.[name] ? [label.name] : []))].join(", ");
   const showCustom = customLabels.some((label) => label.count);
-  addTable(sheet, row, "Card odds (at least 1, 2 or 3 copies)",
-    ["Card", "Qty", "Label", ...(showCustom ? ["Custom label"] : []), ...COPY_HEADERS],
+  addTable(sheet, row, t("export.cardOdds"),
+    [t("export.card"), t("export.qty"), t("export.label"), ...(showCustom ? [t("export.customLabel")] : []), ...copyColumns],
     ["text", "number", "text", ...(showCustom ? ["text" as Format] : []), ...COPY_FORMATS],
     first.cards.map((card) => [
-      card.name, card.copies, labelled ? GROUP_LABELS[card.group] ?? "" : "",
+      // Card groups as the Probabilities panel shows them
+      card.name, card.copies, labelled ? t(`categories.${card.group}`) : "",
       ...(showCustom ? [cardCustom(card.name)] : []), ...copyOdds(first.deck_size, card.copies),
     ]));
 
-  await download(workbook, `${name} - probabilities`);
+  await download(workbook, t("export.statsFileName", { name }));
 }
 
 /** The comparison of two decks, going first and going second (results for hand sizes 5 and 6),
  *  with their custom labels (advanced mode) when they have any */
 export async function exportComparison([first, second]: [Comparison, Comparison], custom: CustomComparison | null = null) {
   const [a, b] = first.names;
-  const sides = [{ result: first, label: "going first" }, { result: second, label: "going second" }];
+  const sides = [{ result: first, turn: t("common.turnFirst") }, { result: second, turn: t("common.turnSecond") }];
   const workbook = await newWorkbook();
 
-  const overview = workbook.addWorksheet("Comparison");
+  const overview = workbook.addWorksheet(t("export.comparisonSheet"));
   // The composition doesn't depend on the hand size
-  let row = addTable(overview, 1, "Composition", ["", a, b, `Diff (${b} − ${a})`], ["text", "number", "number", "number"],
-    [...first.composition, ...(custom?.labels ?? []).map((label) => ({ label: `${label.name} (custom label)`, a: label.a, b: label.b }))]
+  let row = addTable(overview, 1, t("export.composition"), ["", a, b, t("export.diffNamed", { a, b })], ["text", "number", "number", "number"],
+    [...first.composition, ...(custom?.labels ?? []).map((label) => ({ label: t("export.customLabelRow", { name: label.name }), a: label.a, b: label.b }))]
       .map((r) => [r.label, r.a, r.b, r.b - r.a]));
   const oddsRows = (result: Comparison, rows: OddsPair[]): Cell[][] =>
     rows.map((r) => [r.label, r.a, r.b, r.b - r.a, r.better ? result.names[r.better - 1] : ""]);
   const oddsTable = (title: string, result: Comparison, rows: OddsPair[]) =>
-    addTable(overview, row, title, ["", a, b, "Diff", "Better"], ["text", "percent", "percent", "percent", "text"],
+    addTable(overview, row, title, ["", a, b, t("export.diff"), t("export.better")], ["text", "percent", "percent", "percent", "text"],
       oddsRows(result, rows));
-  for (const { result, label } of sides) {
-    row = oddsTable(`Opening hand (${label})`, result, combinationOdds(result));
+  for (const { result, turn } of sides) {
+    row = oddsTable(t("export.openingHand", { turn }), result, combinationOdds(result));
   }
-  for (const { result, label } of sides) {
-    row = oddsTable(`Chance of drawing X or more (${label})`, result, result.at_least.flatMap((group) => group.rows));
+  for (const { result, turn } of sides) {
+    row = oddsTable(t("export.xOrMore", { turn }), result, result.at_least.flatMap((group) => group.rows));
   }
   if (custom) {
-    for (const { result, label } of sides) {
-      row = oddsTable(`Custom labels, chance of drawing X or more (${label})`, result,
+    for (const { result, turn } of sides) {
+      row = oddsTable(t("export.customLabelsXOrMore", { turn }), result,
         compareLabels(custom, result.hand_size).flatMap((group) => group.rows));
     }
   }
-  for (const { result, label } of sides) {
-    row = oddsTable(`Bricks (${label})`, result, result.bricks);
+  for (const { result, turn } of sides) {
+    row = oddsTable(t("export.bricksTurn", { turn }), result, result.bricks);
   }
-  for (const { result, label } of sides) {
+  for (const { result, turn } of sides) {
     const customAverages = custom ? compareLabels(custom, result.hand_size).map((group) => group.average) : [];
-    row = addTable(overview, row, `Average per hand (${label})`, ["", a, b, "Diff"], ["text", "decimal", "decimal", "decimal"],
+    row = addTable(overview, row, t("export.averagePerHandTurn", { turn }), ["", a, b, t("export.diff")], ["text", "decimal", "decimal", "decimal"],
       [...result.averages, ...customAverages].map((r) => [r.label, r.a, r.b, r.b - r.a]));
   }
 
   // One row per card with both hand sizes side by side
   const secondByName = new Map(second.cards.map((c) => [c.name, c]));
-  const cards = workbook.addWorksheet("Card odds");
-  addTable(cards, 1, "Chance of at least 1 copy",
-    ["Card", `${a} qty`, `${b} qty`,
-     `${a} going first`, `${b} going first`, "Diff going first",
-     `${a} going second`, `${b} going second`, "Diff going second", "Changed"],
+  const cards = workbook.addWorksheet(t("export.cardOddsSheet"));
+  addTable(cards, 1, t("export.atLeastOneCopy"),
+    [t("export.card"), t("export.deckQty", { name: a }), t("export.deckQty", { name: b }),
+     t("export.deckGoingFirst", { name: a }), t("export.deckGoingFirst", { name: b }), t("export.diffGoingFirst"),
+     t("export.deckGoingSecond", { name: a }), t("export.deckGoingSecond", { name: b }), t("export.diffGoingSecond"), t("export.changed")],
     ["text", "number", "number", "percent", "percent", "percent", "percent", "percent", "percent", "text"],
     first.cards.map((c) => {
       const s = secondByName.get(c.name);
@@ -283,9 +286,9 @@ export async function exportComparison([first, second]: [Comparison, Comparison]
         c.name, c.a_copies, c.b_copies,
         c.a_copies ? c.a : null, c.b_copies ? c.b : null, c.b - c.a,
         s && c.a_copies ? s.a : null, s && c.b_copies ? s.b : null, s ? s.b - s.a : null,
-        c.changed ? "Yes" : "",
+        c.changed ? t("export.yes") : "",
       ];
     }));
 
-  await download(workbook, `${a} vs ${b} - comparison`);
+  await download(workbook, t("export.comparisonFileName", { a, b }));
 }

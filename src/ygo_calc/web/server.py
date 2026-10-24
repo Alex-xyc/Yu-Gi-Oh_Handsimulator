@@ -113,7 +113,7 @@ class CompareRequest(BaseModel):
 
 # The interactive docs are off on a public server unless asked for
 API_DOCS = os.environ.get("YGO_API_DOCS") == "1"
-app = FastAPI(title="Yu-Gi-Oh! Hand Simulator", redoc_url=None,
+app = FastAPI(title="YGO Calc", redoc_url=None,
               docs_url="/api/docs" if API_DOCS else None,
               openapi_url="/api/openapi.json" if API_DOCS else None)
 app.add_middleware(SecurityMiddleware)

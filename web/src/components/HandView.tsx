@@ -6,7 +6,8 @@
 
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
-import { CATEGORY_LABELS, type DrawnCard, type DrawResult } from "../api";
+import { useTranslation } from "react-i18next";
+import type { DrawnCard, DrawResult } from "../api";
 import type { CustomLabel, CustomLabelOf } from "../customLabels";
 import { CardBack } from "./CardBack";
 import { CardImage, toneColor } from "./common";
@@ -19,20 +20,22 @@ const FACE = "absolute inset-0 overflow-hidden rounded-lg backface-hidden shadow
 const SIXTH_FRAME = "shadow-[0_0_0_3px_var(--color-sixth),0_0_20px_color-mix(in_srgb,var(--color-sixth)_45%,transparent)]";
 
 function SixthLabel() {
+  const { t } = useTranslation();
   return (
     <span className="absolute -top-2.5 left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap rounded-full bg-sixth px-2
                      py-px text-[10px] font-extrabold tracking-wider text-ink uppercase shadow-md">
-      6th card
+      {t("hand.sixthCard")}
     </span>
   );
 }
 
 /** "7th", "8th", … on an extra draw */
 function DrawLabel({ index }: { index: number }) {
+  const { t } = useTranslation();
   return (
     <span className="absolute -top-2.5 left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap rounded-full border border-line
                      bg-surface-2 px-2 py-px text-[10px] font-bold tracking-wider text-muted uppercase shadow-md">
-      {index + 1}th
+      {t("hand.drawNumber", { number: index + 1 })}
     </span>
   );
 }
@@ -42,6 +45,7 @@ function HandCard({ card, id, index, showCategory, custom }: {
   /** Its custom label (advanced mode) */
   custom?: CustomLabel;
 }) {
+  const { t } = useTranslation();
   const category = showCategory && card.category;
   const sixth = index === 5;
   const extra = index > 5;
@@ -65,7 +69,7 @@ function HandCard({ card, id, index, showCategory, custom }: {
           <div className={`${FACE} ${extra ? "opacity-75" : ""}`}>
             <CardImage id={id} name={card.name} size="full" className="h-full" />
             {category && (
-              <span className={`card-badge hand-badge tone-${category}`}>{CATEGORY_LABELS[category]}</span>
+              <span className={`card-badge hand-badge tone-${category}`}>{t(`categories.${category}`)}</span>
             )}
             {custom && (
               <span className={`card-badge hand-badge custom-badge ${category ? "stacked" : ""}`} style={toneColor(custom.color)}>
@@ -79,8 +83,8 @@ function HandCard({ card, id, index, showCategory, custom }: {
             click instead, so a revealed card couldn't be hidden again */}
         {extra && (
           <button type="button" className="reveal-card absolute inset-0 z-[1] cursor-pointer rounded-lg"
-                  aria-label={`${revealed ? "Hide" : "Reveal"} the ${index + 1}th card`} aria-pressed={revealed}
-                  title={revealed ? `${card.name} (click to hide)` : undefined}
+                  aria-label={t(revealed ? "hand.hide" : "hand.reveal", { number: index + 1 })} aria-pressed={revealed}
+                  title={revealed ? t("hand.clickToHide", { name: card.name }) : undefined}
                   onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
                   onClick={() => setRevealed((r) => !r)} />
         )}
@@ -91,7 +95,7 @@ function HandCard({ card, id, index, showCategory, custom }: {
       {revealed ? (
         <span className="truncate text-center text-[11px] text-muted" title={card.name}>{card.name}</span>
       ) : (
-        <span className="truncate text-center text-[11px] text-faint">Click to reveal</span>
+        <span className="truncate text-center text-[11px] text-faint">{t("hand.clickToReveal")}</span>
       )}
     </motion.div>
   );

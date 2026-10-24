@@ -31,8 +31,6 @@
 .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
 .brand h1 { font-size: 21px; }
 .brand .small { font-size: 13.2px; }
-.source-link { font-size: 13.2px; color: var(--color-muted); text-decoration: underline; text-underline-offset: 2px; }
-.source-link:hover { color: var(--color-accent); }
 .logo { width: 48px; height: 48px; flex: none; border-radius: 50%; box-shadow: 0 6px 22px rgba(124, 92, 255, 0.4); }
 .layout { display: flex; flex-direction: column; gap: 16px; }
 /* No backdrop blur here or on overlays: Chrome drops it for a frame while an overlay fades in */

@@ -18,7 +18,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent, memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo,
   useState,
 } from "react";
-import { type Category, CATEGORIES, CATEGORY_LABELS, type DeckCard, type TagKey } from "../api";
+import { Trans, useTranslation } from "react-i18next";
+import { type Category, CATEGORIES, type DeckCard, type TagKey } from "../api";
 import { type CustomLabel, isCustom, labelSettings, MAX_LABEL_NAME, nameProblem } from "../customLabels";
 import { type SortMode, sortedOrder } from "../deckSort";
 import { CardImage, Segmented, SideIcon } from "./common";
@@ -146,14 +147,15 @@ export function useTagEditor({ deckList, tags, custom: savedCustom, labels, adva
 
 /** Undo / Clear all, for the tagging panel's header */
 export const TagHistoryButtons = memo(function TagHistoryButtons({ editor }: { editor: TagEditor }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap gap-2">
-      <Tooltip title="Undo (Ctrl+Z)">
-        <span><Button color="inherit" size="small" onClick={editor.undo} disabled={!editor.canUndo}>Undo</Button></span>
+      <Tooltip title={t("decklist.undoShortcut")}>
+        <span><Button color="inherit" size="small" onClick={editor.undo} disabled={!editor.canUndo}>{t("decklist.undo")}</Button></span>
       </Tooltip>
       <Button color="inherit" size="small" onClick={editor.clearAll}
               disabled={!editor.tags.some(Boolean) && !editor.custom.some(Boolean)}>
-        Clear all
+        {t("decklist.clearAll")}
       </Button>
     </div>
   );
@@ -161,9 +163,10 @@ export const TagHistoryButtons = memo(function TagHistoryButtons({ editor }: { e
 
 /** The switch between the normal controls and the advanced ones (only labels) */
 function AdvancedSwitch({ advanced }: { advanced: boolean }) {
+  const { t } = useTranslation();
   return (
-    <Tooltip title={advanced ? "Back to the normal labelling" : "Only labels: engine, non-engine, brick and your own"}>
-      <FormControlLabel className="ml-auto mr-0" label="Advanced" labelPlacement="start"
+    <Tooltip title={advanced ? t("decklist.advancedOff") : t("decklist.advancedOn")}>
+      <FormControlLabel className="ml-auto mr-0" label={t("decklist.advanced")} labelPlacement="start"
                         control={<Switch size="small" checked={advanced}
                                          onChange={(e) => labelSettings.setAdvanced(e.target.checked)} />} />
     </Tooltip>
@@ -181,6 +184,7 @@ function LabelNameField({ initial = "", except, placeholder, onSave, onCancel, k
   /** Stays (emptied) after saving, for adding several labels */
   keepOpen?: boolean;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initial);
   const [touched, setTouched] = useState(false);
   const problem = nameProblem(name, except);
@@ -205,7 +209,7 @@ function LabelNameField({ initial = "", except, placeholder, onSave, onCancel, k
   return (
     <div className="flex items-start gap-2">
       {field}
-      <Button variant="outlined" onClick={save} disabled={!name.trim()} className="shrink-0">Add label</Button>
+      <Button variant="outlined" onClick={save} disabled={!name.trim()} className="shrink-0">{t("decklist.addLabel")}</Button>
     </div>
   );
 }
@@ -217,12 +221,13 @@ function LabelPill({ name, count, tone, color, selected, onSelect, label }: {
   /** A custom label (renamable, removable) */
   label?: CustomLabel;
 }) {
+  const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
   const style = color ? { ["--tone" as string]: color } : undefined;
   if (label && renaming) {
     return (
       <div className="label-pill editing" style={style}>
-        <LabelNameField initial={label.name} except={label.id} placeholder="Label name"
+        <LabelNameField initial={label.name} except={label.id} placeholder={t("decklist.labelName")}
                         onSave={(next) => { labelSettings.rename(label.id, next); setRenaming(false); }}
                         onCancel={() => setRenaming(false)} />
       </div>
@@ -238,8 +243,8 @@ function LabelPill({ name, count, tone, color, selected, onSelect, label }: {
       </button>
       {label && (
         <>
-          <Tooltip title="Rename">
-            <IconButton size="small" className="label-pill-action" aria-label={`Rename ${label.name}`}
+          <Tooltip title={t("decklist.rename")}>
+            <IconButton size="small" className="label-pill-action" aria-label={t("decklist.renameLabel", { name: label.name })}
                         onClick={() => setRenaming(true)}>
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
                 <path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" strokeWidth="2"
@@ -247,10 +252,10 @@ function LabelPill({ name, count, tone, color, selected, onSelect, label }: {
               </svg>
             </IconButton>
           </Tooltip>
-          <Tooltip title="Remove label">
-            <IconButton size="small" className="label-pill-action" aria-label={`Remove ${label.name}`}
+          <Tooltip title={t("decklist.removeLabel")}>
+            <IconButton size="small" className="label-pill-action" aria-label={t("decklist.removeNamed", { name: label.name })}
                         onClick={() => {
-                          if (count && !window.confirm(`Remove the label "${label.name}"? ${count} card${count === 1 ? "" : "s"} in this deck ${count === 1 ? "has" : "have"} it.`)) return;
+                          if (count && !window.confirm(t("decklist.confirmRemove", { name: label.name, count }))) return;
                           labelSettings.remove(label.id);
                         }}>
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -267,13 +272,14 @@ function LabelPill({ name, count, tone, color, selected, onSelect, label }: {
 /** Advanced mode: only the labels, engine / non-engine / brick and custom ones, and a field to
  *  add more. Picking one makes it the label clicking a card gives. */
 function AdvancedControls({ editor }: { editor: TagEditor }) {
+  const { t } = useTranslation();
   const disabled = editor.deckList.length === 0;
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-      <span className="text-muted">Pick a label, then click cards to give it to them</span>
-      <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0" aria-label="Labels">
+      <span className="text-muted">{t("decklist.pickLabel")}</span>
+      <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0" aria-label={t("decklist.labels")}>
         {CATEGORIES.map((key) => (
-          <LabelPill key={key} name={CATEGORY_LABELS[key]} count={editor.count(key)} tone={key}
+          <LabelPill key={key} name={t(`categories.${key}`)} count={editor.count(key)} tone={key}
                      selected={editor.tool === key} onSelect={() => editor.setTool(key)} />
         ))}
         {editor.labels.map((label) => (
@@ -281,52 +287,51 @@ function AdvancedControls({ editor }: { editor: TagEditor }) {
                      color={label.color} selected={editor.tool === label.id} onSelect={() => editor.setTool(label.id)} />
         ))}
       </fieldset>
-      <LabelNameField keepOpen placeholder="New label, e.g. Starter"
+      <LabelNameField keepOpen placeholder={t("decklist.newLabelPlaceholder")}
                       onSave={(name) => { const label = labelSettings.add(name); if (label) editor.setTool(label.id); }} />
       {/* The switch on the right of "Label all copies" */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <FormControlLabel label="Label all copies" disabled={disabled}
+        <FormControlLabel label={t("decklist.labelAllCopies")} disabled={disabled}
                           control={<Checkbox checked={editor.allCopies} onChange={(e) => editor.setAllCopies(e.target.checked)} />} />
         <AdvancedSwitch advanced />
       </div>
-      <span className="text-xs text-muted">
-        A card can have a custom label as well as engine, non-engine or brick · right-click a card to take its labels off
-      </span>
+      <span className="text-xs text-muted">{t("decklist.advancedHint")}</span>
     </div>
   );
 }
 
 /** Totals, the tag to apply and "mark the rest"; in advanced mode, only the labels */
 export const TagControls = memo(function TagControls({ editor }: { editor: TagEditor }) {
+  const { t } = useTranslation();
   const disabled = editor.deckList.length === 0;
   if (editor.advanced) return <AdvancedControls editor={editor} />;
   return (
     <div className="flex flex-col gap-2.5">
       <div className="tag-totals flex flex-wrap gap-1">
         {CATEGORIES.map((key) => (
-          <Chip key={key} color={TAG_COLOR[key]} label={<>{CATEGORY_LABELS[key]} <b>{editor.count(key)}</b></>} />
+          <Chip key={key} color={TAG_COLOR[key]} label={<>{t(`categories.${key}`)} <b>{editor.count(key)}</b></>} />
         ))}
-        <Chip label={<>Untagged <b>{editor.untagged}</b></>} />
+        <Chip label={<>{t("decklist.untagged")} <b>{editor.untagged}</b></>} />
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
         <div className="tag-tool flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-muted">Click a card to tag it as</span>
-          <Segmented value={isCustom(editor.tool) ? null : editor.tool as TagKey} onChange={editor.setTool} label="Tag to apply"
-                     options={CATEGORIES.map((key) => ({ value: key, label: CATEGORY_LABELS[key], tone: key }))} />
-          <FormControlLabel label="Label all copies" disabled={disabled}
+          <span className="text-muted">{t("decklist.clickToTag")}</span>
+          <Segmented value={isCustom(editor.tool) ? null : editor.tool as TagKey} onChange={editor.setTool} label={t("decklist.tagToApply")}
+                     options={CATEGORIES.map((key) => ({ value: key, label: t(`categories.${key}`), tone: key }))} />
+          <FormControlLabel label={t("decklist.labelAllCopies")} disabled={disabled}
                             control={<Checkbox checked={editor.allCopies} onChange={(e) => editor.setAllCopies(e.target.checked)} />} />
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-muted">Mark the rest ({editor.untagged}) as:</span>
+            <span className="text-muted">{t("decklist.markRest", { count: editor.untagged })}</span>
             <AdvancedSwitch advanced={false} />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {CATEGORIES.map((key) => (
               <Button key={key} variant="outlined" size="small" color={TAG_COLOR[key]} disabled={!editor.untagged}
                       onClick={() => editor.tagRest(key)}>
-                {CATEGORY_LABELS[key]}
+                {t(`categories.${key}`)}
               </Button>
             ))}
           </div>
@@ -336,10 +341,10 @@ export const TagControls = memo(function TagControls({ editor }: { editor: TagEd
   );
 });
 
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: "name", label: "Name" },
-  { value: "label", label: "Label" },
-];
+const SORT_OPTIONS = [
+  { value: "name", label: "decklist.sortName" },
+  { value: "label", label: "decklist.sortLabel" },
+] as const satisfies readonly { value: SortMode; label: string }[];
 
 export interface DeckOrder {
   /** What the list is sorted by, or null once it's been rearranged since (or never sorted) */
@@ -390,15 +395,16 @@ export function useDeckOrder(cards: DeckCard[] | null, deckList: string[], tags:
 
 /** Sort by name or label, and the ascending / descending toggle, for the panel header */
 export const SortControls = memo(function SortControls({ deckOrder }: { deckOrder: DeckOrder }) {
+  const { t } = useTranslation();
   const { descending } = deckOrder;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-muted">Sort by</span>
-      <Segmented small value={deckOrder.sortedBy} onChange={deckOrder.sort} label="Sort the decklist by"
-                 options={SORT_OPTIONS} />
-      <Tooltip title={descending ? "Descending (click for ascending)" : "Ascending (click for descending)"}>
+      <span className="text-xs text-muted">{t("decklist.sortBy")}</span>
+      <Segmented small value={deckOrder.sortedBy} onChange={deckOrder.sort} label={t("decklist.sortDecklistBy")}
+                 options={SORT_OPTIONS.map(({ value, label }) => ({ value, label: t(label) }))} />
+      <Tooltip title={descending ? t("decklist.descendingTooltip") : t("decklist.ascendingTooltip")}>
         <IconButton size="small" onClick={deckOrder.toggleDirection} aria-pressed={descending}
-                    aria-label={descending ? "Descending order" : "Ascending order"}>
+                    aria-label={descending ? t("decklist.descending") : t("decklist.ascending")}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
                className={`transition-transform duration-200 ${descending ? "rotate-180" : ""}`}>
             <path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2"
@@ -442,6 +448,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
   onMove: (cards: number[], target: number, after: boolean) => void;
   scroll?: boolean;
 }) {
+  const { t } = useTranslation();
   // The picked cards (deck positions), kept with the list they belong to
   const [picked, setPicked] = useState<{ list: string[]; cards: Set<number> }>({ list: editor.deckList, cards: new Set() });
   const selected = picked.list === editor.deckList ? picked.cards : new Set<number>();
@@ -484,16 +491,18 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
       <div className="flex flex-wrap [@media(hover:hover)]:min-h-8 items-center gap-x-3 gap-y-1 px-1 pb-1.5 text-xs text-muted" aria-live="polite">
         {selected.size ? (
           <>
-            <span className="selection-count">{selected.size} selected</span>
-            <span>Drag one to move them all · click a card again to unselect it</span>
-            <Button size="small" color="inherit" onClick={clear} className="ml-auto">Clear selection (Esc)</Button>
+            <span className="selection-count">{t("decklist.selected", { count: selected.size })}</span>
+            <span>{t("decklist.selectionHint")}</span>
+            <Button size="small" color="inherit" onClick={clear} className="ml-auto">{t("decklist.clearSelection")}</Button>
           </>
         ) : (
-          <span className="mouse-hint">Drag a card to move it · <b className="font-semibold text-text">Shift+click</b> to select several and move them together</span>
+          <span className="mouse-hint">
+            <Trans i18nKey="decklist.dragHint" components={{ bold: <b className="font-semibold text-text" /> }} />
+          </span>
         )}
         {sided?.some(Boolean) && (
           <span className={`flex items-center gap-1.5 ${selected.size ? "" : "ml-auto"}`}>
-            <SideIcon inline />Sided in
+            <SideIcon inline />{t("decklist.sidedIn")}
           </span>
         )}
       </div>
@@ -523,6 +532,12 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
           const isSelected = selected.has(index);
           const isSided = sided?.[index] ?? false;
           const drop = dropTarget?.index === index ? (dropTarget.after ? "drop-after" : "drop-before") : "";
+          // For screen readers: the name, its labels, and whether it's sided in or selected
+          const tagName = tag ? t(`categories.${tag}`) : "";
+          const labels = tagName && custom ? t("decklist.tileBothLabels", { tag: tagName, custom: custom.name })
+            : tagName || custom?.name || t("decklist.tileUnlabelled");
+          const description = [name, labels, isSided && t("decklist.tileSidedIn"), isSelected && t("decklist.tileSelected")]
+            .filter(Boolean).join(", ");
           return (
             <motion.div key={index}
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -532,9 +547,9 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
                    className={`tag-tile ${tag || custom ? `tagged tone-${tag || "custom"}` : ""} ${isSelected ? "selected" : ""} ${dragging?.includes(index) ? "dragging" : ""} ${drop}`}
                    // A card with only a custom label takes its colour
                    style={!tag && custom ? { ["--tone" as string]: custom.color } : undefined}
-                   aria-label={`${name}, ${[tag && CATEGORY_LABELS[tag], custom?.name].filter(Boolean).join(" and ") || "unlabelled"}${isSided ? ", sided in" : ""}${isSelected ? ", selected" : ""}`}
+                   aria-label={description}
                    // No name tooltip while dragging
-                   title={dragging ? undefined : isSided ? `${name} (sided in)` : name}
+                   title={dragging ? undefined : isSided ? t("decklist.tileSidedInTitle", { name }) : name}
                    // Shift-click would otherwise select the page's text
                    onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                    onClick={(e) => click(e, index)}
@@ -570,7 +585,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
                    onDragEnd={endDrag}>
                 <CardImage id={idByName[name]} name={name} />
                 <span className="tile-tint" />
-                {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
+                {tag && <span className={`card-badge tile-badge tone-${tag}`}>{tagName}</span>}
                 {custom && (
                   <span className={`card-badge tile-badge custom-badge ${tag ? "stacked" : ""}`}
                         style={{ ["--tone" as string]: custom.color }}>{custom.name}</span>

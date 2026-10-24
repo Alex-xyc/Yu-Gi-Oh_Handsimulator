@@ -6,6 +6,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { motion } from "framer-motion";
 import { type CSSProperties, memo, type ReactNode, useId, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { api, combinationOdds, type Comparison, decimalsFor, type DeckSetupBody, type OddsPair, percent, percentWidth } from "../api";
 import { compareLabels, type CustomComparison, useLabelSettings } from "../customLabels";
 import { exportComparison } from "../export";
@@ -21,11 +22,15 @@ export interface CompareDeck extends DeckTab {
 }
 
 const HAND_SIZES = [
-  { size: 5, label: "Going first" },
-  { size: 6, label: "Going second" },
-];
+  { size: 5, label: "common.goingFirst" },
+  { size: 6, label: "common.goingSecond" },
+] as const;
 
-/** Whether more of a composition/average row is good (true), bad (false) or neither (null) */
+/** "going first" or "going second", for a hand size */
+const turnKey = (handSize: number) => (handSize === 5 ? "common.turnFirst" : "common.turnSecond");
+
+/** Whether more of a composition/average row is good (true), bad (false) or neither (null). Keyed by
+ *  the row labels the server sends (in English) */
 const MORE_IS_BETTER: Record<string, boolean | null> = {
   "Deck size": false, "Engine": true, "Non-Engine": true, "Bricks": false, "Untagged": null,
 };
@@ -41,7 +46,8 @@ function deckNames(decks: [CompareDeck, CompareDeck]): [string, string] {
 
 /** Deck 2 minus deck 1; green when that favours deck 2, red when it favours deck 1. */
 function Diff({ value, digits = 1, better = null }: { value: number; digits?: number; better?: 1 | 2 | null }) {
-  if (Math.abs(value) <= 1e-10) return <span className="diff zero"><span aria-hidden="true">–</span><span className="sr-only">No difference</span></span>;
+  const { t } = useTranslation();
+  if (Math.abs(value) <= 1e-10) return <span className="diff zero"><span aria-hidden="true">–</span><span className="sr-only">{t("compare.noDifference")}</span></span>;
   const tone = better === 2 ? "good" : better === 1 ? "bad" : "";
   return <span className={`diff ${tone}`}>{diffText(value, digits)}</span>;
 }
@@ -67,6 +73,7 @@ function columnWidths(result: Comparison, extra: OddsPair[] = []): CSSProperties
 
 /** Probabilities for both decks as paired bars, with the difference and the better deck */
 function OddsRows({ rows, names }: { rows: OddsPair[]; names: [string, string] }) {
+  const { t } = useTranslation();
   return (
     <div className="compare-odds">
       {rows.map((row) => (
@@ -83,7 +90,7 @@ function OddsRows({ rows, names }: { rows: OddsPair[]; names: [string, string] }
           <Diff value={(row.b - row.a) * 100} better={row.better} />
           <span className="better-tag" title={row.better ? names[row.better - 1] : undefined}>
             {row.better && (
-              <><Dot tone={deckTone(row.better - 1)} /><span className="sr-only">Better: </span>{names[row.better - 1]}</>
+              <><Dot tone={deckTone(row.better - 1)} /><span className="sr-only">{t("compare.better")}</span>{names[row.better - 1]}</>
             )}
           </span>
         </div>
@@ -103,13 +110,14 @@ interface TableRow {
 
 /** One value per deck in each row (composition, averages), and the difference */
 function CompareTable({ names, rows }: { names: [string, string]; rows: TableRow[] }) {
+  const { t } = useTranslation();
   return (
     <table className="data-table compare-table">
       <thead>
         <tr>
-          <th scope="col"><span className="sr-only">Statistic</span></th>
+          <th scope="col"><span className="sr-only">{t("compare.statistic")}</span></th>
           {names.map((name) => <th key={name} scope="col"><TruncatedName>{name}</TruncatedName></th>)}
-          <th scope="col">Diff</th>
+          <th scope="col">{t("compare.diff")}</th>
         </tr>
       </thead>
       <tbody>
@@ -139,8 +147,10 @@ function Results({ result, custom, onExport, onError }: {
   onExport: () => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation();
   const [a, b] = result.names;
-  const turn = result.hand_size === 5 ? "going first" : "going second";
+  const turn = t(turnKey(result.hand_size));
+  const turnHint = t("common.inParentheses", { text: turn });
   const customGroups = custom ? compareLabels(custom, result.hand_size) : [];
   return (
     <motion.div className="compare-results" key={JSON.stringify(result.names) + result.hand_size}
@@ -152,25 +162,26 @@ function Results({ result, custom, onExport, onError }: {
                 label={<TruncatedName>{name}</TruncatedName>} />
         ))}
         <span className="muted small">
-          Diff = {b} − {a} (percentage points for odds) · <span className="ok">green</span> favours {b},{" "}
-          <span className="error">red</span> favours {a}
+          {/* The deck names are escaped for the markup and shown as typed */}
+          <Trans i18nKey="compare.legend" values={{ a, b }} shouldUnescape tOptions={{ interpolation: { escapeValue: true } }}
+                 components={{ good: <span className="ok" />, bad: <span className="error" /> }} />
         </span>
       </div>
 
       <section className="stats-section">
-        <SectionHeader title="Composition" action={<ExportButton onExport={onExport} onError={onError} />} />
+        <SectionHeader title={t("compare.composition")} action={<ExportButton onExport={onExport} onError={onError} />} />
         <CompareTable names={result.names} rows={valueRows([
           ...result.composition, ...(custom?.labels ?? []).map((label) => ({ label: label.name, a: label.a, b: label.b })),
         ], 0)} />
       </section>
 
       <section className="stats-section">
-        <SectionHeader title="Opening hand" hint={`(${turn})`} />
+        <SectionHeader title={t("compare.openingHand")} hint={turnHint} />
         <OddsRows rows={combinationOdds(result)} names={result.names} />
       </section>
 
       <section className="stats-section">
-        <SectionHeader title="Chance of drawing X or more" hint={`(${turn})`} />
+        <SectionHeader title={t("compare.xOrMore")} hint={turnHint} />
         <div className="compare-groups">
           {result.at_least.map((group) => (
             <div key={group.key}>
@@ -183,7 +194,7 @@ function Results({ result, custom, onExport, onError }: {
 
       {customGroups.length > 0 && (
         <section className="stats-section">
-          <SectionHeader title="Custom labels" hint={`(chance of drawing X or more, ${turn})`} />
+          <SectionHeader title={t("compare.customLabels")} hint={t("compare.customHint", { turn })} />
           <div className="compare-groups">
             {customGroups.map(({ label, rows }) => (
               <div key={label.id}>
@@ -198,12 +209,12 @@ function Results({ result, custom, onExport, onError }: {
       )}
 
       <section className="stats-section">
-        <SectionHeader title="Bricks" hint={`(${turn})`} />
+        <SectionHeader title={t("compare.bricks")} hint={turnHint} />
         <OddsRows rows={result.bricks} names={result.names} />
       </section>
 
       <section className="stats-section">
-        <SectionHeader title="Average per hand" hint={`(${turn})`} />
+        <SectionHeader title={t("compare.averagePerHand")} hint={turnHint} />
         <CompareTable names={result.names} rows={valueRows([...result.averages, ...customGroups.map((group) => group.average)], 2)} />
       </section>
     </motion.div>
@@ -216,6 +227,7 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
   onClose: () => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation();
   const [picked, setPicked] = useState<[number, number]>([0, 1]);
   const [handSize, setHandSize] = useState(5);
   const [result, setResult] = useState<Comparison | null>(null);
@@ -243,10 +255,10 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
   };
 
   const compare = async (size = handSize) => {
-    if (!chosen || !names) return onError("Open a second deck tab to compare.");
+    if (!chosen || !names) return onError(t("compare.needSecondDeck"));
     const bodies = chosen.map((deck, i) => deck.setup.body(names[i]));
     for (const i of [0, 1] as const) {
-      if (!bodies[i]) return onError(`${names[i]}: No deck loaded.`);
+      if (!bodies[i]) return onError(t("compare.noDeckLoaded", { name: names[i] }));
     }
     setBusy(true);
     try {
@@ -260,7 +272,7 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
       setResultBodies(pair);
       setCustom(customLabels.length ? { sizes: [chosen[0].setup.size, chosen[1].setup.size], labels: customLabels } : null);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Comparison failed.");
+      onError(e instanceof Error ? e.message : t("compare.failed"));
     } finally {
       setBusy(false);
     }
@@ -281,8 +293,8 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
   return (
     <div className="compare-view">
       <div className="overlay-header">
-        <h2 id={`${id}-title`}>Compare decks</h2>
-        <Button color="inherit" onClick={onClose}>Close</Button>
+        <h2 id={`${id}-title`}>{t("compare.title")}</h2>
+        <Button color="inherit" onClick={onClose}>{t("common.close")}</Button>
       </div>
 
       {chosen ? (
@@ -290,14 +302,14 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
           {chosen.map((deck, side) => (
             <div key={side} className="card-panel compare-pick">
               <span className="compare-pick-label" id={`${id}-pick-${side}`}>
-                <Dot tone={deckTone(side)} />{side ? "Deck B" : "Deck A"}
+                <Dot tone={deckTone(side)} />{side ? t("compare.deckB") : t("compare.deckA")}
               </span>
               <Select labelId={`${id}-pick-${side}`} fullWidth value={deck.slot} className="compare-select"
                       onChange={(e) => pick(side, Number(e.target.value))}>
                 {decks.map((option) => (
                   <MenuItem key={option.slot} value={option.slot} className="compare-option">
                     <span className="truncate-name">{option.name}</span>
-                    {option.size !== null && <span className="muted small deck-count">· {option.size} cards</span>}
+                    {option.size !== null && <span className="muted small deck-count">{t("common.deckSize", { count: option.size })}</span>}
                   </MenuItem>
                 ))}
               </Select>
@@ -307,24 +319,25 @@ export const CompareView = memo(function CompareView({ decks, onClose, onError }
         </div>
       ) : (
         <p className="card-panel muted center m-0">
-          Only one deck is open. Open another with the <b>+</b> next to the deck tabs, then pick the two to compare here.
+          <Trans i18nKey="compare.onlyOneDeck" components={{ bold: <b /> }} />
         </p>
       )}
 
       <div className="compare-actions">
-        <Segmented value={handSize} onChange={changeHandSize} label="Hand size"
-                   options={HAND_SIZES.map(({ size, label }) => ({ value: size, label }))} />
+        <Segmented value={handSize} onChange={changeHandSize} label={t("compare.handSize")}
+                   options={HAND_SIZES.map(({ size, label }) => ({ value: size, label: t(label) }))} />
         <Button variant="contained" size="large" onClick={() => compare()} disabled={busy || !chosen} className="compare-button">
-          {busy ? <Spinner /> : "Calculate & Compare"}
+          {busy ? <Spinner /> : t("compare.calculate")}
         </Button>
       </div>
 
       {/* A short status for screen readers when a comparison finishes (not the whole result) */}
       <p className="sr-only" role="status">
-        {busy ? "Calculating…" : result ? `Compared ${result.names[0]} and ${result.names[1]}, ${result.hand_size === 5 ? "going first" : "going second"}.` : ""}
+        {busy ? t("compare.calculating")
+          : result ? t("compare.compared", { a: result.names[0], b: result.names[1], turn: t(turnKey(result.hand_size)) }) : ""}
       </p>
       {result ? <Results result={result} custom={custom} onExport={exportBoth} onError={onError} /> : (
-        <p className="muted center">Pick two of your open decks, then calculate. Labels are set in each deck's tab.</p>
+        <p className="muted center">{t("compare.pickDecks")}</p>
       )}
     </div>
   );

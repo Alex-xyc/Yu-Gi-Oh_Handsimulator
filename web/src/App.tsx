@@ -1,5 +1,6 @@
 import Button from "@mui/material/Button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Overlay, type Toast, Toasts } from "./components/common";
 import { CompareView } from "./components/CompareView";
 import { type DeckTab, DeckTabs, MAX_DECKS } from "./components/DeckTabs";
@@ -15,11 +16,12 @@ function useDeckSlots(saved: SavedTabs | null): DeckSetup[] {
   return useMemo(() => slots, slots);
 }
 
-/** Each tab's name: its .ydk file's name, else "New deck"; repeats get " (1)", " (2)", … in tab order */
-function tabNames(setups: DeckSetup[]): string[] {
+/** Each tab's name: its .ydk file's name, else `untitled` ("New deck"); repeats get " (1)", " (2)",
+ *  … in tab order */
+function tabNames(setups: DeckSetup[], untitled: string): string[] {
   const seen = new Map<string, number>();
   return setups.map((setup) => {
-    const name = (setup.cards && setup.name) || "New deck";
+    const name = (setup.cards && setup.name) || untitled;
     const repeats = seen.get(name) ?? 0;
     seen.set(name, repeats + 1);
     return repeats ? `${name} (${repeats})` : name;
@@ -27,6 +29,7 @@ function tabNames(setups: DeckSetup[]): string[] {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   // The tabs open before the page was refreshed, read once
   const [saved] = useState(() => loadTabs(MAX_DECKS));
   const slots = useDeckSlots(saved);
@@ -53,13 +56,13 @@ export default function App() {
   }, []);
 
   const tabs = useMemo((): DeckTab[] => {
-    const names = tabNames(open.map((slot) => slots[slot]));
+    const names = tabNames(open.map((slot) => slots[slot]), t("app.newDeck"));
     return open.map((slot, i) => ({ slot, name: names[i], size: slots[slot].cards ? slots[slot].size : null }));
-  }, [open, slots]);
+  }, [open, slots, t]);
 
   const addTab = () => {
     const slot = Array.from({ length: MAX_DECKS }, (_, i) => i).find((i) => !open.includes(i));
-    if (slot === undefined) return showError(`You can have up to ${MAX_DECKS} decks open.`);
+    if (slot === undefined) return showError(t("app.tooManyDecks", { count: MAX_DECKS }));
     setOpen([...open, slot]);
     setActive(slot);
   };
@@ -92,15 +95,12 @@ export default function App() {
           <div className="brand">
             <img className="logo" src="/icon-192.png" alt="" />
             <div>
-              <h1>Hand Simulator</h1>
-              <span className="muted small">Yu-Gi-Oh! hypergeometric calculator · by Xin Yuan · </span>
-              {/* Outside the subtitle so it stays on phones: AGPL section 13 asks for a visible source link */}
-              <a className="source-link" href="https://github.com/Alex-xyc/Yu-Gi-Oh_Handsimulator"
-                 target="_blank" rel="noopener noreferrer">Source</a>
+              <h1>{t("app.name")}</h1>
+              <span className="muted small">{t("app.tagline")}</span>
             </div>
           </div>
           <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>
-            Compare<span className="max-sm:hidden">&nbsp;decks</span>
+            <span className="max-sm:hidden">{t("app.compareLong")}</span><span className="sm:hidden">{t("app.compareShort")}</span>
           </Button>
         </header>
 
@@ -112,7 +112,7 @@ export default function App() {
       </div>
 
       {/* Built once at start-up and kept, so opening and closing it is only the animation */}
-      <Overlay open={comparing} onClose={closeCompare} label="Compare decks" keepMounted asWindow>
+      <Overlay open={comparing} onClose={closeCompare} label={t("compare.title")} keepMounted asWindow>
         <CompareView decks={compareDecks} onClose={closeCompare} onError={showError} />
       </Overlay>
 

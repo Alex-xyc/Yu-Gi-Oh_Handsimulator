@@ -5,7 +5,8 @@
 
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { type Category, CATEGORY_LABELS } from "../api";
+import { useTranslation } from "react-i18next";
+import type { Category } from "../api";
 import { type DeckSetup, MAX_COPIES } from "../useDeckSetup";
 import { CardImage, SideIcon } from "./common";
 
@@ -41,12 +42,17 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
   cardWidth: number | null;
   onToggle: (index: number) => void;
 }) {
-  const verb = pick === "out" ? "side out" : "side in";
+  const { t } = useTranslation();
+  const verb = pick === "out" ? t("side.sideOut") : t("side.sideIn");
   return (
     <section className="flex min-h-0 flex-col" aria-label={title}>
       <h3 className="m-0 flex h-7 items-center gap-2">
-        {title} <span className="font-normal text-muted">· {list.length} cards</span>
-        {picked.size > 0 && <span className={`side-count ${pick}`}>{picked.size} {pick}</span>}
+        {title} <span className="font-normal text-muted">{t("common.deckSize", { count: list.length })}</span>
+        {picked.size > 0 && (
+          <span className={`side-count ${pick}`}>
+            {t(pick === "out" ? "side.pickedOut" : "side.pickedIn", { count: picked.size })}
+          </span>
+        )}
       </h3>
       <ul className="m-0 grid list-none justify-center gap-2" style={{ padding: `${OUTLINE}px 0`,
           gridTemplateColumns: `repeat(${columns}, ${cardWidth === null ? "minmax(0, 1fr)" : `${cardWidth}px`})` }}>
@@ -54,16 +60,18 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
           const isPicked = picked.has(i);
           const tag = tags[i];
           const isMoved = moved[i] ?? false;
+          const tagName = tag ? t(`categories.${tag}`) : "";
+          const card = [name, tagName, isMoved && movedLabel].filter(Boolean).join(", ");
           return (
             <li key={i} className="min-w-0">
               <button type="button" className={`side-tile ${isPicked ? pick : ""}`}
                       title={isMoved ? `${name} (${movedLabel})` : name} aria-pressed={isPicked}
-                      aria-label={`${name}${tag ? `, ${CATEGORY_LABELS[tag]}` : ""}${isMoved ? `, ${movedLabel}` : ""}: ${verb}`}
+                      aria-label={t("side.tileAction", { card, action: verb })}
                       onClick={() => onToggle(i)}>
                 <CardImage id={idByName[name]} name={name} />
-                {tag && <span className={`card-badge tile-badge tone-${tag}`}>{CATEGORY_LABELS[tag]}</span>}
+                {tag && <span className={`card-badge tile-badge tone-${tag}`}>{tagName}</span>}
                 {isMoved && <SideIcon />}
-                {isPicked && <span className="side-mark" aria-hidden="true">{pick === "out" ? "OUT" : "IN"}</span>}
+                {isPicked && <span className="side-mark" aria-hidden="true">{pick === "out" ? t("side.markOut") : t("side.markIn")}</span>}
               </button>
             </li>
           );
@@ -74,6 +82,7 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
 }
 
 export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: () => void }) {
+  const { t } = useTranslation();
   const id = useId();
   const { deckList, sideList, tags, idByName } = setup;
   const [out, setOut] = useState<Set<number>>(new Set());
@@ -89,12 +98,12 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
   }, [deckList, sideList, out, into]);
 
   const canSwap = out.size > 0 && out.size === into.size && !overLimit;
-  const status = overLimit ? `Too many copies of ${overLimit} (at most ${MAX_COPIES}).`
-    : out.size > into.size ? `Pick ${out.size - into.size} more from the side deck to swap.`
-    : into.size > out.size ? `Pick ${into.size - out.size} more from the main deck to swap.`
-    : out.size ? `Ready to swap ${out.size} card${out.size > 1 ? "s" : ""}.`
-    : swapped ? `Swapped ${swapped} card${swapped > 1 ? "s" : ""}.`
-    : "Pick cards to side out of the main deck and as many to side in.";
+  const status = overLimit ? t("side.tooManyCopies", { name: overLimit, max: MAX_COPIES })
+    : out.size > into.size ? t("side.pickMoreFromSide", { count: out.size - into.size })
+    : into.size > out.size ? t("side.pickMoreFromMain", { count: into.size - out.size })
+    : out.size ? t("side.readyToSwap", { count: out.size })
+    : swapped ? t("side.swapped", { count: swapped })
+    : t("side.pickCards");
 
   const swap = () => {
     if (!canSwap) return;
@@ -136,28 +145,28 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
     <div className="flex h-full flex-col gap-3.5">
       <div className="overlay-header pinned flex-wrap">
         <div className="min-w-0">
-          <h2 id={`${id}-title`}>Side deck</h2>
+          <h2 id={`${id}-title`}>{t("side.title")}</h2>
           <p className="m-0 text-muted" aria-live="polite">
             <span className={overLimit ? "error" : canSwap ? "ok" : ""}>{status}</span>
             {(setup.sidedIn > 0 || setup.sideFromMain.some(Boolean)) && (
               <span className="ml-3 inline-flex items-center gap-1.5 text-xs">
-                <SideIcon inline />Swapped from the other deck
+                <SideIcon inline />{t("side.swappedFromOther")}
               </span>
             )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button color="inherit" onClick={clear} disabled={!out.size && !into.size}>Clear</Button>
+          <Button color="inherit" onClick={clear} disabled={!out.size && !into.size}>{t("common.clear")}</Button>
           <Button variant="contained" onClick={swap} disabled={!canSwap} className="min-w-[120px]">
-            Swap {out.size} ⇄ {into.size}
+            {t("side.swap", { out: out.size, in: into.size })}
           </Button>
-          <Button color="inherit" onClick={onClose}>Close</Button>
+          <Button color="inherit" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>
       <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
-        <DeckGrid title="Main deck" list={deckList} tags={tags} moved={setup.sided} movedLabel="sided in" picked={out} pick="out" idByName={idByName}
+        <DeckGrid title={t("side.mainDeck")} list={deckList} tags={tags} moved={setup.sided} movedLabel={t("side.sidedIn")} picked={out} pick="out" idByName={idByName}
                   columns={columns} cardWidth={cardWidth} onToggle={(i) => setOut(toggled(out, i))} />
-        <DeckGrid title="Side deck" list={sideList} tags={setup.sideTags} moved={setup.sideFromMain} movedLabel="sided out"
+        <DeckGrid title={t("side.sideDeck")} list={sideList} tags={setup.sideTags} moved={setup.sideFromMain} movedLabel={t("side.sidedOut")}
                   picked={into} pick="in" idByName={idByName}
                   columns={columns} cardWidth={cardWidth} onToggle={(i) => setInto(toggled(into, i))} />
       </div>

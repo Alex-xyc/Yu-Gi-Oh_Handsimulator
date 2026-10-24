@@ -1,4 +1,4 @@
-"""Yu-Gi-Oh! Hand Simulator package.
+"""YGO Calc package.
 
 Layout:
     core/   Deck model, deck-code parsing, categories, probability maths, simulation and

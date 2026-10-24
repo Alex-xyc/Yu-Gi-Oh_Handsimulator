@@ -35,9 +35,12 @@ jobs:
       - name: Check the server settings
         run: |
           missing=0
-          for name in VPS_HOST VPS_USER DOMAIN SSH_KEY KNOWN_HOSTS; do
+          # Each setting by its name in the env block, then as GitHub knows it
+          for pair in VPS_HOST:variable:VPS_HOST VPS_USER:variable:VPS_USER DOMAIN:variable:DOMAIN \
+                      SSH_KEY:secret:VPS_SSH_KEY KNOWN_HOSTS:secret:VPS_SSH_KNOWN_HOSTS; do
+            IFS=: read -r name kind github_name <<< "$pair"
             if [ -z "${!name}" ]; then
-              echo "::error::$name is not set. See the README section \"Deploy on a VPS\" for the secrets and variables to add."
+              echo "::error::The repository $kind $github_name is not set. Add it under Settings > Secrets and variables > Actions > ${kind^}s (see the README section \"Deploy on a VPS\")."
               missing=1
             fi
           done

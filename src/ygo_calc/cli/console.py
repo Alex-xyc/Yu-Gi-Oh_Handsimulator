@@ -173,7 +173,7 @@ def load_ydk_file(filename: str) -> str:
 def run_simulator():
     """Main simulator loop."""
     print("\n" + "=" * 50)
-    print("YU-GI-OH TEST HAND SIMULATOR")
+    print("YGO CALC: TEST HAND SIMULATOR")
     print("=" * 50)
     print("Type 'quit' at any time to exit.")
 
