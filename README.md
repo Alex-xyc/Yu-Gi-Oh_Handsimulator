@@ -1,8 +1,8 @@
-# Yu-Gi-Oh! Hand Simulator
+# YGO Calc
 
 Copyright (c) 2026 Alex-xyc
 
-This application is an opening-hand simulator and probability calculator for Yu-Gi-Oh! decks. It lets you load a deck from a `.ydk` file or paste a `ydke://` deck code, draw simulated opening hands, and view probabilities for drawing engine pieces, handtraps (non-engine), or 'brick' cards.
+YGO Calc is an opening-hand simulator and probability calculator for Yu-Gi-Oh! decks. It lets you load a deck from a `.ydk` file or paste a `ydke://` deck code, draw simulated opening hands, and view probabilities for drawing engine pieces, handtraps (non-engine), or 'brick' cards.
 
 What this repository contains
 
@@ -88,6 +88,14 @@ python src/web.py            # http://127.0.0.1:8000  (API docs at /api/docs)
 
 While working on the front end, run `python src/web.py` and `cd web && npm run dev`
 side by side: Vite serves the page with hot reload and forwards /api to the server.
+
+Translations: the page's text is in `web/src/i18n/locales/` (`en.json`, English, for now the only
+language), used through i18next / react-i18next. Text goes there rather than in the components:
+`t("section.key")` in a component (from `useTranslation()`), `i18n.t(...)` elsewhere; the keys are
+type-checked against `en.json`. To add a language, copy `en.json` to `<code>.json`, translate the
+values and register it in `web/src/i18n/index.ts`; a test checks it has the same keys and
+placeholders as English. (Labels the server sends, such as the comparison's row names, are still
+English.)
 
 Deploy on a server with Docker Compose (from the project folder):
 

@@ -4,6 +4,7 @@
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api, type DrawResult, prefetchCardImages, type Stats } from "../api";
 import { countLabels, type CustomLabelCount, type CustomLabelOf, useLabelSettings } from "../customLabels";
 import { exportStats } from "../export";
@@ -27,6 +28,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   shortcuts: boolean;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<Stats | null>(null);
   const [draw, setDraw] = useState<DrawResult | null>(null);
   const [drawId, setDrawId] = useState(0);
@@ -71,7 +73,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   }, [bodyKey, setup.cards, onError]);
 
   const drawHand = async () => {
-    if (!body) return onError("Load a deck first.");
+    if (!body) return onError(t("workspace.loadFirst"));
     setDrawing(true);
     try {
       const result = await api.draw(body);
@@ -79,7 +81,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
       setStats(result.stats);
       setDrawId((n) => n + 1);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Draw failed.");
+      onError(e instanceof Error ? e.message : t("workspace.drawFailed"));
     } finally {
       setDrawing(false);
     }
@@ -132,7 +134,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
   return (
     <main className="layout" hidden={!active} aria-label={name}>
       <section className="card-panel" aria-labelledby={`${id}-load`}>
-        <h2 id={`${id}-load`} className="sr-only">Load a deck</h2>
+        <h2 id={`${id}-load`} className="sr-only">{t("workspace.loadDeck")}</h2>
         <DeckLoader setup={setup} onError={onError} />
       </section>
 
@@ -144,17 +146,17 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="card-panel flex min-w-0 flex-col gap-5 max-lg:contents" aria-labelledby={`${id}-label`}>
           <div className="workspace-part min-w-0">
-            <SectionHeader as="h2" id={`${id}-label`} title="Label your decklist" action={<TagHistoryButtons editor={editor} />} />
+            <SectionHeader as="h2" id={`${id}-label`} title={t("workspace.labelDecklist")} action={<TagHistoryButtons editor={editor} />} />
             <TagControls editor={editor} />
           </div>
           <div className="workspace-part flex min-w-0 flex-col max-lg:-order-1 lg:border-t lg:border-line lg:pt-4">
-            <SectionHeader as="h2" title="Test hand" action={
+            <SectionHeader as="h2" title={t("workspace.testHand")} action={
               <div className="flex flex-wrap justify-end gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-2">
                 <Button variant="outlined" onClick={() => setShowingDeck(true)} disabled={!draw}>
-                  <span className="max-sm:hidden">Show shuffled deck</span><span className="sm:hidden">Shuffled deck</span>
+                  <span className="max-sm:hidden">{t("workspace.showShuffledDeck")}</span><span className="sm:hidden">{t("workspace.shuffledDeck")}</span>
                 </Button>
                 <Button variant="contained" className="min-w-[130px]" onClick={drawHand} disabled={!setup.cards || drawing}>
-                  {drawing ? <Spinner /> : draw ? "Draw again" : "Draw hand"}
+                  {drawing ? <Spinner /> : draw ? t("workspace.drawAgain") : t("workspace.drawHand")}
                 </Button>
               </div>
             } />
@@ -164,17 +166,17 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
 
         <section className="card-panel flex min-w-0 flex-col max-lg:max-h-[560px] lg:h-0 lg:min-h-full"
                  aria-labelledby={`${id}-list`}>
-          <SectionHeader as="h2" id={`${id}-list`} title="Decklist"
-                         hint={setup.cards ? `· ${setup.size} cards` : undefined}
+          <SectionHeader as="h2" id={`${id}-list`} title={t("workspace.decklist")}
+                         hint={setup.cards ? t("common.deckSize", { count: setup.size }) : undefined}
                          action={setup.cards ? (
                            <div className="flex flex-wrap items-center gap-3">
                              <SortControls deckOrder={deckOrder} />
-                             <Tooltip title={!setup.side ? "This deck was saved before side decks were kept: load it again to get its side deck"
-                                             : setup.side.length ? `Swap cards with the side deck (${setup.sideList.length} cards)`
-                                             : "This deck has no side deck"}>
+                             <Tooltip title={!setup.side ? t("workspace.sideDeckUnknown")
+                                             : setup.side.length ? t("workspace.sideDeckSwap", { count: setup.sideList.length })
+                                             : t("workspace.sideDeckNone")}>
                                <span>
                                  <Button variant="outlined" size="small" onClick={openSide} disabled={!setup.side?.length}>
-                                   Side deck
+                                   {t("workspace.sideDeck")}
                                  </Button>
                                </span>
                              </Tooltip>
@@ -184,22 +186,22 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
             <TagGrid editor={editor} idByName={setup.idByName} sided={setup.sided} order={deckOrder.order} onMove={deckOrder.move} scroll />
           ) : (
             <p className="m-0 grid flex-1 place-items-center p-6 text-center text-muted">
-              Load a deck, then click its cards to label them as engine, non-engine or brick.
+              {t("workspace.emptyDecklist")}
             </p>
           )}
         </section>
       </div>
 
-      <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label="Shuffled deck" asWindow fit>
+      <Overlay open={showingDeck && draw !== null} onClose={closeDeck} label={t("shuffled.title")} asWindow fit>
         {draw && <ShuffledDeckView deck={draw.deck} idByName={setup.idByName} tagged={setup.labelled} customOf={customOf} onClose={closeDeck} />}
       </Overlay>
 
-      <Overlay open={siding && setup.cards !== null} onClose={closeSide} label="Side deck" asWindow fit>
+      <Overlay open={siding && setup.cards !== null} onClose={closeSide} label={t("side.title")} asWindow fit>
         {setup.cards && <SideDeckView key={sideOpenings} setup={setup} onClose={closeSide} />}
       </Overlay>
 
       <section className="card-panel stats-panel min-h-[320px]" aria-labelledby={`${id}-stats`}>
-        <SectionHeader as="h2" id={`${id}-stats`} title="Probabilities"
+        <SectionHeader as="h2" id={`${id}-stats`} title={t("workspace.probabilities")}
                        action={<ExportButton disabled={!stats} onError={onError} onExport={exportAll} />} />
         <StatsView stats={stats} tagged={setup.labelled} hasHand={draw !== null} sidedCards={sidedCards}
                    customLabels={customCounts} customInHand={customInHand}

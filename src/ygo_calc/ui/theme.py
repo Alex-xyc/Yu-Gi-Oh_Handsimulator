@@ -1,7 +1,7 @@
 """Colours, fonts and fixed texts used across the UI."""
 
-APP_TITLE = "Yu-Gi-Oh! Hand Simulator by Xin Yuan"
-HEADER_TITLE = "Yu-Gi-Oh Hand Simulator By Xin Yuan"
+APP_TITLE = "YGO Calc by Xin Yuan"
+HEADER_TITLE = "YGO Calc by Xin Yuan"
 APP_USER_MODEL_ID = "AlexXYC.YuGiOhHandSimulator"
 ICON_FILE = ("icons", "ghattic.ico")
 

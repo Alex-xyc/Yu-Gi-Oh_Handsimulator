@@ -1,4 +1,4 @@
-"""Start the console (text) version of the Yu-Gi-Oh! Hand Simulator.
+"""Start the console (text) version of YGO Calc.
 
 The code lives in the ygo_calc package. The names below are re-exported so existing
 `import main` code keeps working.

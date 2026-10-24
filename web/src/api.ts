@@ -1,14 +1,11 @@
 // Types and calls for the Python API (src/ygo_calc/web/server.py)
 
+import i18n from "./i18n";
+
 export type Category = "brick" | "non_engine" | "engine" | "";
+/** The labels' names are translated: t(`categories.${key}`) */
 export const CATEGORIES = ["engine", "non_engine", "brick"] as const;
 export type TagKey = (typeof CATEGORIES)[number];
-
-export const CATEGORY_LABELS: Record<TagKey, string> = {
-  engine: "Engine",
-  non_engine: "Non-Engine",
-  brick: "Brick",
-};
 
 /** A card's TCG banlist status: "ocg" when it's out in the OCG but not the TCG yet, "" when unlimited
  *  (or not known) */
@@ -125,7 +122,7 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     signal,
   });
   if (!response.ok) {
-    let message = `Request failed (${response.status})`;
+    let message = i18n.t("common.requestFailed", { status: response.status });
     try {
       const data = await response.json();
       if (typeof data.detail === "string") message = data.detail;

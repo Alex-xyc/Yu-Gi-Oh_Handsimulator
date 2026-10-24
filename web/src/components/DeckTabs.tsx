@@ -5,6 +5,7 @@
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export const MAX_DECKS = 6;
 
@@ -23,6 +24,7 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
   onClose: (slot: number) => void;
   onAdd: () => void;
 }) {
+  const { t } = useTranslation();
   const full = tabs.length >= MAX_DECKS;
   const closable = tabs.length > 1;
   const nav = useRef<HTMLElement>(null);
@@ -40,7 +42,7 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
   }, [active, tabs.length]);
 
   return (
-    <nav className="deck-tabs" aria-label="Decks" ref={nav}>
+    <nav className="deck-tabs" aria-label={t("tabs.label")} ref={nav}>
       <ul className="deck-tab-list">
         {/* popLayout: a closing tab leaves the row at once (it fades out on top of it), so the
             tabs after it slide left straight away instead of waiting, and sometimes staying put */}
@@ -56,11 +58,11 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
                         onAuxClick={(e) => { if (e.button === 1 && closable) onClose(tab.slot); }}>
                   <span className="deck-tab-name">{tab.name}</span>
                   {tab.size !== null && (
-                    <span className="deck-tab-size">{tab.size}<span className="sr-only"> cards</span></span>
+                    <span className="deck-tab-size">{tab.size}<span className="sr-only"> {t("tabs.cards", { count: tab.size })}</span></span>
                   )}
                 </button>
                 {closable && (
-                  <button type="button" className="deck-tab-close" aria-label={`Close ${tab.name}`}
+                  <button type="button" className="deck-tab-close" aria-label={t("tabs.close", { name: tab.name })}
                           onClick={() => onClose(tab.slot)}>
                     <span aria-hidden="true">×</span>
                   </button>
@@ -70,11 +72,11 @@ export function DeckTabs({ tabs, active, onSelect, onClose, onAdd }: {
           })}
         </AnimatePresence>
       </ul>
-      <Tooltip title={full ? `Up to ${MAX_DECKS} decks` : "New deck"}>
+      <Tooltip title={full ? t("tabs.full", { count: MAX_DECKS }) : t("tabs.newDeck")}>
         {/* A span, so the tooltip still shows while the button is disabled */}
         <span className="flex-none">
           <button type="button" className="deck-tab-add" onClick={onAdd} disabled={full}
-                  aria-label={full ? `New deck (up to ${MAX_DECKS} decks)` : "New deck"}>
+                  aria-label={full ? t("tabs.newDeckFull", { count: MAX_DECKS }) : t("tabs.newDeck")}>
             <span aria-hidden="true">+</span>
           </button>
         </span>

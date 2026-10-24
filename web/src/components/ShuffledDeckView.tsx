@@ -7,7 +7,8 @@
 
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { CATEGORY_LABELS, type DrawnCard } from "../api";
+import { useTranslation } from "react-i18next";
+import type { DrawnCard } from "../api";
 import type { CustomLabelOf } from "../customLabels";
 import { CardImage, toneColor } from "./common";
 
@@ -28,6 +29,7 @@ export function ShuffledDeckView({ deck, idByName, tagged, customOf, onClose }: 
   customOf?: CustomLabelOf;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const id = useId();
 
   // The widest card that lets every row fit both the width and the height of the space left
@@ -68,12 +70,10 @@ export function ShuffledDeckView({ deck, idByName, tagged, customOf, onClose }: 
     <div className="flex h-full flex-col gap-3.5">
       <div className="overlay-header pinned">
         <div>
-          <h2 id={`${id}-title`}>Shuffled deck</h2>
-          <p className="m-0 text-muted">
-            Top to bottom, as drawn: cards 1–5 are the opening hand, card 6 is the draw going second.
-          </p>
+          <h2 id={`${id}-title`}>{t("shuffled.title")}</h2>
+          <p className="m-0 text-muted">{t("shuffled.description")}</p>
         </div>
-        <Button color="inherit" onClick={onClose}>Close</Button>
+        <Button color="inherit" onClick={onClose}>{t("common.close")}</Button>
       </div>
       <div ref={area} className="min-h-0 flex-1 max-sm:overflow-y-auto max-sm:overscroll-contain">
         <ol className="m-0 grid list-none justify-center gap-2 p-0"
@@ -86,7 +86,7 @@ export function ShuffledDeckView({ deck, idByName, tagged, customOf, onClose }: 
               <div className={`relative rounded-[7px] ${i === 5 ? SIXTH_FRAME : i < 5 ? HAND_FRAME : ""}`}>
                 <CardImage id={idByName[card.name]} name={card.name} />
                 {category && (
-                  <span className={`card-badge tile-badge tone-${category}`}>{CATEGORY_LABELS[category]}</span>
+                  <span className={`card-badge tile-badge tone-${category}`}>{t(`categories.${category}`)}</span>
                 )}
                 {custom && (
                   <span className={`card-badge tile-badge custom-badge ${category ? "stacked" : ""}`} style={toneColor(custom.color)}>

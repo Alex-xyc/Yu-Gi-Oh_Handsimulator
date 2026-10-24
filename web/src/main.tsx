@@ -3,6 +3,8 @@ import { StyledEngineProvider, ThemeProvider } from "@mui/material/styles";
 import { MotionConfig } from "framer-motion";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+// The translations, set up before anything renders
+import "./i18n";
 import App from "./App";
 // The fonts are bundled with the app (no requests to Google Fonts)
 import "@fontsource/inter/latin-400.css";

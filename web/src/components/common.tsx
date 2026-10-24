@@ -7,31 +7,26 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { type BanStatus, cardImageUrl, loadedImages, percent, percentDigits } from "../api";
+import { useTranslation } from "react-i18next";
+import { cardImageUrl, loadedImages, percent, percentDigits } from "../api";
 import { useBanStatus } from "../banStatus";
 
 const IMAGE_RETRY_MS = 30_000;
 
-const BAN_LABELS: Record<Exclude<BanStatus, "">, string> = {
-  banned: "Forbidden in the TCG",
-  limited: "Limited (1 copy) in the TCG",
-  semi_limited: "Semi-Limited (2 copies) in the TCG",
-  ocg: "OCG only: not out in the TCG yet",
-};
-
 /** The banlist icon in a card's top right corner: a red ring on black (struck through when
  *  forbidden, else a yellow 1 or 2), or a red-framed "OCG" for a card not out in the TCG yet */
 function BanMark({ id }: { id?: string }) {
+  const { t } = useTranslation();
   const status = useBanStatus(id);
   if (!status) return null;
-  const label = BAN_LABELS[status];
+  const label = t(`banlist.${status}`);
   const digit = { limited: "1", semi_limited: "2" }[status as string];
   return (
     <span className={`ban-mark ${status === "ocg" ? "ocg" : ""}`} role="img" aria-label={label} title={label}>
       {status === "ocg" ? (
         <svg viewBox="0 0 44 24" aria-hidden="true">
           <rect x="1.75" y="1.75" width="40.5" height="20.5" rx="4" className="ban-face" />
-          <text x="22" y="13" className="ban-text" fontSize="13.5">OCG</text>
+          <text x="22" y="13" className="ban-text" fontSize="13.5">{t("banlist.ocgMark")}</text>
         </svg>
       ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -50,11 +45,12 @@ function BanMark({ id }: { id?: string }) {
 /** "SIDE" in a blue frame, in the banlist icons' style: a card that's out of the deck it started in
  *  (sided in, or sided out). Top left on a card, or `inline` in text (a legend) */
 export function SideIcon({ inline = false, className = "" }: { inline?: boolean; className?: string }) {
+  const { t } = useTranslation();
   return (
     <span className={`side-icon ${inline ? "inline" : ""} ${className}`} aria-hidden="true">
       <svg viewBox="0 0 52 24" aria-hidden="true">
         <rect x="1.75" y="1.75" width="48.5" height="20.5" rx="4" className="side-face" />
-        <text x="26" y="13" className="ban-text side-text" fontSize="13.5">SIDE</text>
+        <text x="26" y="13" className="ban-text side-text" fontSize="13.5">{t("banlist.sideMark")}</text>
       </svg>
     </span>
   );

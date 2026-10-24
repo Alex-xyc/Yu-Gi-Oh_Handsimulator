@@ -1,4 +1,4 @@
-"""Advanced deck view for the Yu-Gi-Oh! Hand Simulator.
+"""Advanced deck view for YGO Calc.
 
 Shows the main deck as a grid of card images where each card can be tagged
 as a brick, non-engine or engine card. Tagged cards are tinted with their

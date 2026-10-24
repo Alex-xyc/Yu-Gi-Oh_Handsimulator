@@ -1,4 +1,4 @@
-"""Start the web version of the Yu-Gi-Oh! Hand Simulator (API + built front end).
+"""Start the web version of YGO Calc (API + built front end).
 
     python src/web.py                     http://127.0.0.1:8000
     HOST=0.0.0.0 PORT=80 python src/web.py

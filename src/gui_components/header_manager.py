@@ -15,7 +15,7 @@ def create_top_section(app: Any):
     deck_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
     deck_frame.grid_columnconfigure(1, weight=1)
 
-    title_label = ctk.CTkLabel(deck_frame, text="Yu-Gi-Oh Hand Simulator By Xin Yuan",
+    title_label = ctk.CTkLabel(deck_frame, text="YGO Calc by Xin Yuan",
                                 font=ctk.CTkFont(size=24, weight="bold"))
     title_label.grid(row=0, column=0, columnspan=3, pady=(10, 15))
 

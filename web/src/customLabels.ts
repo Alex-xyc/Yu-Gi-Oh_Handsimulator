@@ -4,7 +4,8 @@
 // so a page refresh brings them back; which cards have them is kept with each deck.
 
 import { useSyncExternalStore } from "react";
-import { CATEGORY_LABELS, type DrawnCard, type OddsPair } from "./api";
+import { CATEGORIES, type DrawnCard, type OddsPair } from "./api";
+import i18n from "./i18n";
 import { atLeastEach } from "./odds";
 
 const KEY = "ygo-hand-simulator:labels:v1";
@@ -67,10 +68,13 @@ const subscribe = (listener: () => void) => {
 /** Why `name` can't be a label's name (blank, too long, taken), or null when it can */
 export function nameProblem(name: string, except?: string): string | null {
   const trimmed = name.trim();
-  if (!trimmed) return "Give the label a name";
-  if (trimmed.length > MAX_LABEL_NAME) return `At most ${MAX_LABEL_NAME} characters`;
-  const taken = [...Object.values(CATEGORY_LABELS), ...settings.labels.filter((l) => l.id !== except).map((l) => l.name)];
-  if (taken.some((other) => other.toLowerCase() === trimmed.toLowerCase())) return "There's already a label with that name";
+  if (!trimmed) return i18n.t("decklist.nameEmpty");
+  if (trimmed.length > MAX_LABEL_NAME) return i18n.t("decklist.nameTooLong", { count: MAX_LABEL_NAME });
+  const taken = [
+    ...CATEGORIES.map((key) => i18n.t(`categories.${key}`)),
+    ...settings.labels.filter((l) => l.id !== except).map((l) => l.name),
+  ];
+  if (taken.some((other) => other.toLowerCase() === trimmed.toLowerCase())) return i18n.t("decklist.nameTaken");
   return null;
 }
 
@@ -126,7 +130,7 @@ export function compareLabels({ sizes, labels }: CustomComparison, handSize: num
     const a = atLeastEach(sizes[0], label.a, handSize);
     const b = atLeastEach(sizes[1], label.b, handSize);
     const rows: OddsPair[] = Array.from({ length: Math.max(a.length, b.length) }, (_, i) => ({
-      label: `At least ${i + 1} ${label.name}`, a: a[i] ?? 0, b: b[i] ?? 0, better: null,
+      label: i18n.t("common.atLeastLabel", { count: i + 1, name: label.name }), a: a[i] ?? 0, b: b[i] ?? 0, better: null,
     }));
     const average = { label: label.name, a: (label.a * handSize) / sizes[0], b: (label.b * handSize) / sizes[1] };
     return { label, rows, average };
