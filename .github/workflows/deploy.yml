@@ -1,7 +1,8 @@
-# Deploys the web app to Google Cloud Run once CI has passed on main.
-# Needs GCP_PROJECT_ID, GCP_REGION, GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOY_SERVICE_ACCOUNT, which
-# cloudrun-setup.sh prints (see README "Deploy on Google Cloud Run"). They aren't secret, so repository
-# variables are the place for them, but repository secrets with the same names work too.
+# Deploys the web app to the VPS once CI has passed on main: builds the image, pushes it to the
+# GitHub Container Registry (ghcr.io), then over SSH has the server pull it and restart (deploy/compose.yaml).
+# Needs, under Settings > Secrets and variables > Actions (see README "Deploy on a VPS"):
+#   secrets   VPS_SSH_KEY (the deploy key's private half), VPS_SSH_KNOWN_HOSTS (ssh-keyscan of the server)
+#   variables VPS_HOST (the server's address), VPS_USER (the deploy user), DOMAIN (the site's domain)
 
 name: Deploy
 
@@ -22,65 +23,85 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # signs in to Google Cloud with Workload Identity Federation (no stored key)
+      packages: write   # pushes the image to ghcr.io, and lets the server pull it during this job
     env:
-      PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
-      REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION }}
-      WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER || secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT || secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      VPS_HOST: ${{ vars.VPS_HOST }}
+      VPS_USER: ${{ vars.VPS_USER }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+      TAG: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - name: Check the Google Cloud settings
+      - name: Check the server settings
         run: |
           missing=0
-          for name in PROJECT_ID REGION WORKLOAD_IDENTITY_PROVIDER DEPLOY_SERVICE_ACCOUNT; do
+          for name in VPS_HOST VPS_USER DOMAIN SSH_KEY KNOWN_HOSTS; do
             if [ -z "${!name}" ]; then
-              echo "::error::GCP_$name is not set. Add it under Settings > Secrets and variables > Actions > Variables."
+              echo "::error::$name is not set. See the README section \"Deploy on a VPS\" for the secrets and variables to add."
               missing=1
             fi
           done
           if [ "$missing" = 1 ]; then exit 1; fi
-          # The image name, built here as the env block can't refer to its own entries
-          echo "IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/ygo-calc/web:${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+          # ghcr.io wants the owner in lower case
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ygo-calc" >> "$GITHUB_ENV"
 
       - name: Checkout the tested commit
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Sign in to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.DEPLOY_SERVICE_ACCOUNT }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v3
+      - name: Sign in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the image
-        run: |
-          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Scales to zero when idle and wakes on the next request. One instance at most: the rate
-      # limits are counted in that process's memory. Card images are cached in the Cloud Storage
-      # bucket mounted at /cache (owned by the image's app user, uid 10001). The EDOPro SQLite
-      # databases are used from the container's own /tmp, as the bucket mount has no file locking;
-      # a copy is kept in the bucket (/cache/edopro), so a restarted instance copies them from there
-      # instead of downloading them from GitHub again.
-      # YGO_PROXY_HOPS=1: Cloud Run's front end is the one proxy in front of the app, so the rate
-      # limits go by the address it appends to X-Forwarded-For (see web/security.py).
-      - name: Deploy to Cloud Run
+      - name: Set up SSH
         run: |
-          gcloud run deploy ygo-calc \
-            --image "$IMAGE" \
-            --region "$REGION" \
-            --service-account "ygo-calc-run@$PROJECT_ID.iam.gserviceaccount.com" \
-            --port 8000 \
-            --cpu 1 --memory 1Gi \
-            --min-instances 0 --max-instances 1 \
-            --execution-environment gen2 \
-            --add-volume "name=cache,type=cloud-storage,bucket=$PROJECT_ID-ygo-cache,mount-options=uid=10001;gid=10001" \
-            --add-volume-mount "volume=cache,mount-path=/cache" \
-            --set-env-vars "LOCALAPPDATA=/tmp,YGO_PROXY_HOPS=1" \
-            --allow-unauthenticated
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Only the pinned host key is accepted, so a server that isn't ours can't take the deploy
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      # The server gets compose.yaml, the Caddyfile and an .env naming this build, so `docker
+      # compose` run there by hand works on the same settings. It signs in to ghcr.io with this
+      # job's token (valid only while the job runs) to pull the image, then signs out again.
+      - name: Deploy to the server
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh vps 'mkdir -p ~/ygo-calc'
+          scp deploy/compose.yaml deploy/Caddyfile vps:ygo-calc/
+          printf 'DOMAIN=%s\nIMAGE=%s\nIMAGE_TAG=%s\n' "$DOMAIN" "$IMAGE" "$TAG" | ssh vps 'cat > ~/ygo-calc/.env'
+          printf '%s' "$REGISTRY_TOKEN" | ssh vps "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh vps 'set -e
+            cd ~/ygo-calc
+            trap "docker logout ghcr.io" EXIT
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f'
+
+      - name: Check the site is up
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors -o /dev/null "https://$DOMAIN/"

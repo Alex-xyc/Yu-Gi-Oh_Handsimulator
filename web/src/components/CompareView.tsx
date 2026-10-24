@@ -99,28 +99,22 @@ interface TableRow {
   a: ReactNode;
   b: ReactNode;
   diff: ReactNode;
-  className?: string;
 }
 
-/** One value per deck in each row (composition, averages, card odds), and the difference */
-function CompareTable({ names, rows, firstHeader }: {
-  names: [string, string];
-  rows: TableRow[];
-  /** The first column's heading; when not given it's only read out by screen readers */
-  firstHeader?: string;
-}) {
+/** One value per deck in each row (composition, averages), and the difference */
+function CompareTable({ names, rows }: { names: [string, string]; rows: TableRow[] }) {
   return (
     <table className="data-table compare-table">
       <thead>
         <tr>
-          <th scope="col">{firstHeader ?? <span className="sr-only">Statistic</span>}</th>
+          <th scope="col"><span className="sr-only">Statistic</span></th>
           {names.map((name) => <th key={name} scope="col"><TruncatedName>{name}</TruncatedName></th>)}
           <th scope="col">Diff</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.key} className={row.className}>
+          <tr key={row.key}>
             {row.label}<td className="mono">{row.a}</td><td className="mono">{row.b}</td><td>{row.diff}</td>
           </tr>
         ))}
@@ -129,8 +123,7 @@ function CompareTable({ names, rows, firstHeader }: {
   );
 }
 
-const rowHeader = (text: string, className = "") =>
-  <th scope="row" className={`text-left font-normal ${className}`}>{text}</th>;
+const rowHeader = (text: string) => <th scope="row" className="text-left font-normal">{text}</th>;
 
 /** Rows of whole numbers or decimals, the difference coloured by which deck it favours */
 const valueRows = (rows: { label: string; a: number; b: number }[], digits: number): TableRow[] =>
@@ -160,7 +153,7 @@ function Results({ result, custom, onExport, onError }: {
         ))}
         <span className="muted small">
           Diff = {b} − {a} (percentage points for odds) · <span className="ok">green</span> favours {b},{" "}
-          <span className="error">red</span> favours {a} · card odds: green when higher in {b}
+          <span className="error">red</span> favours {a}
         </span>
       </div>
 
@@ -212,16 +205,6 @@ function Results({ result, custom, onExport, onError }: {
       <section className="stats-section">
         <SectionHeader title="Average per hand" hint={`(${turn})`} />
         <CompareTable names={result.names} rows={valueRows([...result.averages, ...customGroups.map((group) => group.average)], 2)} />
-      </section>
-
-      <section className="stats-section">
-        <SectionHeader title="Card odds" hint={`(at least 1 copy, ${turn}, changed cards first)`} />
-        <CompareTable names={result.names} firstHeader="Card" rows={result.cards.map((card) => ({
-          key: card.name, className: card.changed ? "changed" : "", label: rowHeader(card.name, "card-name"),
-          a: card.a_copies ? `${card.a_copies}× ${percent(card.a)}` : "–",
-          b: card.b_copies ? `${card.b_copies}× ${percent(card.b)}` : "–",
-          diff: <Diff value={(card.b - card.a) * 100} better={favours(card.b - card.a, true)} />,
-        }))} />
       </section>
     </motion.div>
   );

@@ -498,7 +498,7 @@ export const TagGrid = memo(function TagGrid({ editor, idByName, sided, order, o
         )}
       </div>
       {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: mouse shortcuts for the space between cards (Escape also clears the selection, the sort buttons also order the cards) */}
-      <div className={`grid select-none grid-cols-5 content-start gap-2 px-1.5 py-1.5 sm:grid-cols-10 ${scroll ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : ""}`}
+      <div className={`grid select-none grid-cols-5 content-start gap-2 px-1.5 py-1.5 sm:grid-cols-10 ${scroll ? "min-h-0 flex-1 overflow-y-auto" : ""}`}
            // A click on the space between cards drops the selection; dragging past the last card
            // puts the cards at the end
            onClick={(e) => { if (e.target === e.currentTarget) clear(); }}

@@ -329,13 +329,12 @@ table { border-collapse: collapse; width: 100%; }
 .compare-results { display: flex; flex-direction: column; gap: 22px; }
 .compare-legend { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .compare-legend .MuiChip-root { max-width: min(260px, 100%); }
-.compare-legend .MuiChip-root .dot { margin-right: 0; }
+.compare-legend .MuiChip-root .dot { margin: 0 -3px 0 10px; }
 /* Compact enough that all five totals fit on one row in the side panel */
 .tag-totals .MuiChip-label { padding-left: 8px; padding-right: 8px; }
 .compare-table { table-layout: fixed; }
 .compare-table td:not(:first-child), .compare-table th:not(:first-child) { text-align: right; white-space: nowrap; width: 130px; }
 .compare-table th:not(:first-child) .truncate-name { text-transform: none; }
-.compare-table tr.changed td { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
 /* Each statistic gets its own band, divided by a line */
 .compare-odds { display: flex; flex-direction: column; }
 .compare-odds-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(160px, 2fr) auto minmax(90px, 140px);
