@@ -23,7 +23,7 @@ except ImportError:  # The web dependencies are optional (requirements-web.txt)
 SMALL = "https://images.ygoprodeck.com/images/cards_small/{}.jpg"
 CARD_LIST = {"data": [
     {"id": 100, "name": "Ash &amp; Blossom", "type": "Effect Monster", "frameType": "effect", "level": 3,
-     "banlist_info": {"ban_tcg": "Limited"},
+     "banlist_info": {"ban_tcg": "Limited"}, "misc_info": [{"formats": ["TCG", "OCG"], "genesys_points": 18}],
      "card_images": [{"id": 100, "image_url_small": SMALL.format(100)},
                      {"id": 101, "image_url_small": SMALL.format(101)}]},
     {"id": 200, "name": "Called by the Grave", "type": "Spell Card", "frameType": "spell", "race": "Quick-Play",
@@ -56,11 +56,12 @@ class TestCatalog(unittest.TestCase):
             ids = catalog.refresh()
         self.assertEqual(sorted(ids), ["100", "101", "200"])
         self.assertEqual(cache.names["100"], "Ash & Blossom")
-        self.assertEqual(cache.info["100"], {"kind": "monster", "level": 3, "status": "limited"})
-        self.assertEqual(cache.info["200"], {"kind": "spell_quick_play", "level": 0, "status": "ocg"})
+        self.assertEqual(cache.info["100"], {"kind": "monster", "level": 3, "status": "limited", "points": 18})
+        self.assertEqual(cache.info["200"], {"kind": "spell_quick_play", "level": 0, "status": "ocg", "points": 0})
         # An alternate artwork: the card's name, its own picture
         self.assertEqual(cache.names["101"], "Ash & Blossom")
         self.assertEqual(cache.image_urls["101"], SMALL.format(101))
+        self.assertEqual(cache.info["101"]["points"], 18)
         self.assertTrue(os.path.exists(os.path.join(self.temp, "cards.json")))
 
     def test_saved_list_is_reused_until_the_version_changes(self):

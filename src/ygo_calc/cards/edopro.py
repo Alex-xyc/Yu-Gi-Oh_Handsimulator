@@ -32,16 +32,17 @@ EDOPRO_SUBTYPES = ((0x10000, "quick_play"), (0x20000, "continuous"), (0x40000, "
 
 def _edopro_info(card_type: int, level: int, ot: int = 0) -> dict:
     """A card's kind (monster, spell_<subtype>, trap_<subtype>), level and status ("ocg" if it's
-    out in the OCG but not the TCG, else "": EDOPro doesn't know the banlist) from its EDOPro data."""
+    out in the OCG but not the TCG, else "": EDOPro doesn't know the banlist) from its EDOPro data.
+    Genesys points are 0: EDOPro doesn't know them either."""
     status = "ocg" if ot & EDOPRO_OT_OCG and not ot & EDOPRO_OT_TCG else ""
     if card_type & (EDOPRO_TYPE_SPELL | EDOPRO_TYPE_TRAP):
         base = "spell" if card_type & EDOPRO_TYPE_SPELL else "trap"
         subtype = next((name for bit, name in EDOPRO_SUBTYPES if card_type & bit), "normal")
-        return {"kind": f"{base}_{subtype}", "level": 0, "status": status}
+        return {"kind": f"{base}_{subtype}", "level": 0, "status": status, "points": 0}
     if card_type & EDOPRO_TYPE_MONSTER:
         # The low byte is the level; the rest holds the pendulum scales
-        return {"kind": "monster", "level": level & 0xff, "status": status}
-    return {"kind": "", "level": 0, "status": status}
+        return {"kind": "monster", "level": level & 0xff, "status": status, "points": 0}
+    return {"kind": "", "level": 0, "status": status, "points": 0}
 
 
 def _edopro_cache_dir() -> str:

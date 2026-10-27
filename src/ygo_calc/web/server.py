@@ -4,7 +4,7 @@ The server keeps no per-user state: the browser holds the deck and its tags or
 counts and sends them with each request.
 
     POST /api/decks                  deck code -> main and side deck card lists
-    POST /api/decks/info             card IDs -> each card's kind, level and banlist status (for
+    POST /api/decks/info             card IDs -> each card's kind, level, banlist status and Genesys points (for
                                      decks saved before the card list had them, and a fresh status)
     POST /api/stats                  deck setup -> opening-hand odds
     POST /api/draw                   deck setup -> random hand, next draws, shuffled deck + odds for it
@@ -137,8 +137,8 @@ CARD_ID = re.compile(r"[0-9]{1,10}")
 def load_deck(body: DeckCode):
     """Look up a ydke:// code or .ydk file text; returns the main and side decks in deck order,
     with each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for
-    sorting, and its TCG status (banned, limited, semi_limited, ocg for not out in the TCG yet, or
-    "")."""
+    sorting, its TCG status (banned, limited, semi_limited, ocg for not out in the TCG yet, or
+    "") and its Genesys points."""
     deck = YuGiOhDeck()
     try:
         card_ids = load_main_deck(deck, body.code)
@@ -162,7 +162,7 @@ class CardIds(BaseModel):
 @app.post("/api/decks/info")
 def card_infos(body: CardIds):
     """Each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown), level and TCG
-    status (banned, limited, semi_limited, ocg or "")."""
+    status (banned, limited, semi_limited, ocg or "") and Genesys points."""
     ids = [cid for cid in dict.fromkeys(body.ids) if CARD_ID.fullmatch(cid)]
     return fetch_card_infos(ids)
 

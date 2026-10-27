@@ -39,6 +39,18 @@
     "ocgMark": "OCG",
     "sideMark": "SIDE"
   },
+  "genesys": {
+    "toggle": "Genesys",
+    "toggleOn": "Show each card's Genesys points and the deck's total instead of the TCG banlist",
+    "toggleOff": "Back to the TCG banlist",
+    "cardPoints_one": "Genesys: {{count}} point",
+    "cardPoints_other": "Genesys: {{count}} points",
+    "total": "{{total}} / {{cap}} pts",
+    "totalLoading": "Looking up the cards' Genesys points…",
+    "totalTitle": "Genesys points: main deck {{main}}, side deck {{side}}, out of {{cap}}. The Extra Deck isn't loaded, so its cards aren't counted.",
+    "overCap_one": "{{count}} point over the {{cap}}-point limit.",
+    "overCap_other": "{{count}} points over the {{cap}}-point limit."
+  },
   "tabs": {
     "label": "Decks",
     "cards_one": "card",

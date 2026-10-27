@@ -17,12 +17,13 @@ from . import cache
 from .http import fetch_json
 from .ygoprodeck import card_info
 
-ALL_CARDS_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes"
+# format=genesys adds each card's Genesys points (and still lists every card)
+ALL_CARDS_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes&format=genesys"
 DB_VERSION_URL = "https://db.ygoprodeck.com/api/v7/checkDBVer.php"
 # The full list is tens of MB of JSON; anything far bigger isn't it
 MAX_LIST_BYTES = 150 * 1024 * 1024
 # Bump when the saved file's layout changes, so an old one is downloaded again
-FORMAT = 1
+FORMAT = 2
 
 
 def cache_base_dir() -> str:
@@ -61,7 +62,8 @@ def _remote_version() -> Optional[str]:
 
 
 def _parse(data: dict) -> Dict[str, dict]:
-    """Card ID -> name, kind, level, status and small image URL, from the full card list."""
+    """Card ID -> name, kind, level, status, Genesys points and small image URL, from the full
+    card list."""
     cards: Dict[str, dict] = {}
     for card in data.get("data", []):
         entry = {"name": html.unescape(card["name"]), **card_info(card)}
@@ -99,7 +101,7 @@ def _download(version: Optional[str]) -> dict:
 def _apply(cards: Dict[str, dict]):
     """Put the cards into the shared caches, where the deck lookups find them."""
     cache.names.update({cid: card["name"] for cid, card in cards.items()})
-    cache.info.update({cid: {"kind": card["kind"], "level": card["level"], "status": card["status"]}
+    cache.info.update({cid: {key: card[key] for key in ("kind", "level", "status", "points")}
                        for cid, card in cards.items()})
     cache.image_urls.update({cid: card["image"] for cid, card in cards.items() if card["image"]})
     cache.full_list = True

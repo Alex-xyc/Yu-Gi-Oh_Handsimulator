@@ -1,6 +1,10 @@
 import Button from "@mui/material/Button";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Switch from "@mui/material/Switch";
+import Tooltip from "@mui/material/Tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { setGenesys, useGenesys } from "./banStatus";
 import { Overlay, type Toast, Toasts } from "./components/common";
 import { CompareView } from "./components/CompareView";
 import { type DeckTab, DeckTabs, MAX_DECKS } from "./components/DeckTabs";
@@ -26,6 +30,18 @@ function tabNames(setups: DeckSetup[], untitled: string): string[] {
     seen.set(name, repeats + 1);
     return repeats ? `${name} (${repeats})` : name;
   });
+}
+
+/** The switch between the TCG banlist and Genesys points on the cards, for every tab */
+function GenesysSwitch() {
+  const { t } = useTranslation();
+  const genesys = useGenesys();
+  return (
+    <Tooltip title={genesys ? t("genesys.toggleOff") : t("genesys.toggleOn")}>
+      <FormControlLabel className="m-0" label={t("genesys.toggle")} labelPlacement="start"
+                        control={<Switch size="small" checked={genesys} onChange={(e) => setGenesys(e.target.checked)} />} />
+    </Tooltip>
+  );
 }
 
 export default function App() {
@@ -99,9 +115,12 @@ export default function App() {
               <span className="muted small">{t("app.tagline")}</span>
             </div>
           </div>
-          <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>
-            <span className="max-sm:hidden">{t("app.compareLong")}</span><span className="sm:hidden">{t("app.compareShort")}</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <GenesysSwitch />
+            <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>
+              <span className="max-sm:hidden">{t("app.compareLong")}</span><span className="sm:hidden">{t("app.compareShort")}</span>
+            </Button>
+          </div>
         </header>
 
         {/* Keyed by slot: closing a tab unmounts it, so a reopened slot starts fresh */}
