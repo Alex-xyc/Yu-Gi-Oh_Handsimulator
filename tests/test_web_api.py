@@ -184,7 +184,8 @@ class TestWebFiles(unittest.TestCase):
         import tempfile
         from fastapi import FastAPI
         from ygo_calc.web.server import WebFiles
-        folder = tempfile.TemporaryDirectory()
+        # Kept for the whole test, then removed by the cleanup
+        folder = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.addCleanup(folder.cleanup)
         os.makedirs(os.path.join(folder.name, "assets"))
         for name in ("index.html", os.path.join("assets", "index-abc123.js")):

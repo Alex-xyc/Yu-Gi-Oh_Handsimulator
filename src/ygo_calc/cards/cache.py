@@ -13,8 +13,8 @@ aliases: Dict[str, str] = {}
 info: Dict[str, Dict[str, Union[str, int]]] = {}
 
 # Whether YGOPRODeck's whole card list is loaded (catalog.py): then it has nothing to tell about
-# IDs that aren't in it, so they aren't sent to it
-full_list = False
+# IDs that aren't in it, so they aren't sent to it. Set at runtime, so not a constant.
+full_list = False  # pylint: disable=invalid-name
 
 # Card IDs no source knew, until when they aren't looked up again (so made-up IDs can't make the
 # server ask YGOPRODeck and EDOPro about them over and over)
