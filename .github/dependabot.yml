@@ -1,0 +1,9 @@
+# The workflows' actions are pinned to commit hashes (a moved tag can't change what runs, which
+# matters most in Deploy: it can push the image the server runs). Dependabot opens a pull request
+# when a newer release comes out, updating the hash and its version comment together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

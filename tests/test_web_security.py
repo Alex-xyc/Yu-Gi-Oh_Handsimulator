@@ -223,7 +223,8 @@ class TestNewImages(unittest.TestCase):
         client = TestClient(app)
         with tempfile.TemporaryDirectory() as cache_dir, \
              patch.object(images, "fetch_bytes", return_value=b"jpeg"), \
-             patch.object(images, "image_cache_dir", return_value=cache_dir):
+             patch.object(images, "image_cache_dir", return_value=cache_dir), \
+             patch.dict(images.cache.names, {"999999993": "A card"}):   # a deck lookup found it
             response = client.get("/api/cards/999999993/image")      # just downloaded
             self.assertEqual((response.status_code, response.content), (200, b"jpeg"))
             self.assertEqual(response.headers["content-type"], "image/jpeg")
@@ -465,12 +466,28 @@ class TestAsyncImages(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, \
              patch.object(images, "image_cache_dir", return_value=folder), \
              patch.object(images, "_download_slots", threading.BoundedSemaphore(1)) as slots, \
+             patch.dict(images.cache.names, {"999999983": "A card"}), \
              patch.object(images, "fetch_bytes") as fetch:
             slots.acquire()   # the one slot is taken
             response = TestClient(app).get("/api/cards/999999983/image")
             slots.release()
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.headers["retry-after"], str(images.BUSY_RETRY_SECONDS))
+        fetch.assert_not_called()
+
+    def test_unknown_card_images_not_downloaded(self):
+        import tempfile
+        from ygo_calc.web import images
+        from ygo_calc.web.server import app
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(images, "image_cache_dir", return_value=folder), \
+             patch.dict(images.cache.unknown, {"999999985": float("inf")}), \
+             patch.object(images, "fetch_bytes") as fetch:
+            client = TestClient(app)
+            # Not looked up yet (maybe a real card in a saved deck): try again shortly
+            self.assertEqual(client.get("/api/cards/999999984/image").status_code, 503)
+            # Looked up, and no source knew it
+            self.assertEqual(client.get("/api/cards/999999985/image").status_code, 404)
         fetch.assert_not_called()
 
 

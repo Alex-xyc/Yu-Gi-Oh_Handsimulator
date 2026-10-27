@@ -20,6 +20,7 @@ Copyright (c) 2026 Alex-xyc
 import os
 import random
 import re
+from contextlib import asynccontextmanager
 from typing import List, Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
@@ -36,6 +37,7 @@ from ..core.deck_parser import DeckParseError
 from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck, load_side_deck
 from ..paths import SRC_DIR
+from . import prefetch
 from .images import SIZES, ImageUnavailable, get_card_image
 from .security import SecurityMiddleware
 
@@ -111,9 +113,18 @@ class CompareRequest(BaseModel):
 
 # The app
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Card data and images are fetched in the background while the server runs (prefetch.py)."""
+    stop = prefetch.start() if prefetch.ENABLED else None
+    yield
+    if stop:
+        stop.set()
+
+
 # The interactive docs are off on a public server unless asked for
 API_DOCS = os.environ.get("YGO_API_DOCS") == "1"
-app = FastAPI(title="YGO Calc", redoc_url=None,
+app = FastAPI(title="YGO Calc", redoc_url=None, lifespan=lifespan,
               docs_url="/api/docs" if API_DOCS else None,
               openapi_url="/api/openapi.json" if API_DOCS else None)
 app.add_middleware(SecurityMiddleware)

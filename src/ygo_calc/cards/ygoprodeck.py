@@ -143,6 +143,10 @@ def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
 def _lookup(card_ids: List[str]) -> Tuple[List[dict], bool]:
     """YGOPRODeck's entries for these IDs, and whether it answered (if it couldn't be reached,
     the cards it didn't return may still exist)."""
+    # Its whole card list is loaded and these aren't in it: YGOPRODeck doesn't know them either
+    # (until its next version), so made-up IDs can't spend its request budget (cards/http.py)
+    if cache.full_list:
+        return [], True
     try:
         data = fetch_json(CARDINFO_URL.format(ids=",".join(card_ids)), timeout=20)
         return list(data.get('data', [])), True

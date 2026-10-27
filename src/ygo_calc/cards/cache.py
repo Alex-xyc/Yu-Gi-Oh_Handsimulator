@@ -12,6 +12,10 @@ aliases: Dict[str, str] = {}
 # Card ID -> {"kind": "monster" / "spell_<subtype>" / "trap_<subtype>", "level": monster level}
 info: Dict[str, Dict[str, Union[str, int]]] = {}
 
+# Whether YGOPRODeck's whole card list is loaded (catalog.py): then it has nothing to tell about
+# IDs that aren't in it, so they aren't sent to it
+full_list = False
+
 # Card IDs no source knew, until when they aren't looked up again (so made-up IDs can't make the
 # server ask YGOPRODeck and EDOPro about them over and over)
 UNKNOWN_FOR_SECONDS = 30 * 60
