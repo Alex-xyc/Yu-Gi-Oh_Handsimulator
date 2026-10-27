@@ -140,13 +140,20 @@ Card images and the EDOPro databases are kept in a Docker volume across deploys.
    answers.
 
 On the server (`ssh deploy@<server-ip>`, then `cd ygo-calc`): `docker compose logs -f web` for
-the server log, `docker compose ps` for what's running. To roll back, re-run an earlier Deploy
-workflow, or run `IMAGE_TAG=<commit> docker compose up -d` there.
+the server log, `docker compose ps` for what's running. A deploy whose build doesn't come up
+healthy goes back to the previous build by itself (the run still shows as failed). To roll back by
+hand, re-run an earlier Deploy workflow, or run `IMAGE_TAG=<commit> docker compose up -d` there:
+the server keeps two weeks of builds.
 
 Settings (environment variables): `HOST` / `PORT` (default 127.0.0.1:8000, the Docker
 image uses 0.0.0.0), `YGO_CACHE_DIR` (image cache), `YGO_IMAGE_MEMORY_MB` (recently served
 images kept in memory, default 96), `YGO_WEB_DIST` (built front end),
 `YGO_API_DOCS=1` (serve the interactive API docs at /api/docs; off by default).
+While it runs, the server downloads YGOPRODeck's whole card list and every card's small image
+into the cache in the background (slowly; the first pass takes about two hours and ~370 MB),
+so decks load without waiting on YGOPRODeck: `YGO_PREFETCH=0` turns this off,
+`YGO_PREFETCH_SIZES=small,full` adds the full-size images (~2.4 GB more) and
+`YGO_PREFETCH_PER_SECOND` sets the pace (default 2 images a second).
 Put it behind a reverse proxy such as Caddy or nginx for HTTPS.
 
 Security (src/ygo_calc/web/security.py): every response carries security headers (a strict

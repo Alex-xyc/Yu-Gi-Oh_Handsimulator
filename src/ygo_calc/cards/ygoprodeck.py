@@ -9,8 +9,9 @@ from . import cache
 from .edopro import fetch_edopro_card_names
 from .http import fetch_json
 
-# misc=yes adds each card's formats (TCG / OCG / …), to tell OCG-only cards apart
-CARDINFO_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids}&misc=yes"
+# misc=yes adds each card's formats (TCG / OCG / …), to tell OCG-only cards apart, and with
+# format=genesys its Genesys points (every card is still listed, with the same fields otherwise)
+CARDINFO_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php?id={ids}&misc=yes&format=genesys"
 # A spell or trap card's "race" -> its subtype
 SUBTYPES = {"Normal": "normal", "Quick-Play": "quick_play", "Continuous": "continuous", "Field": "field",
             "Equip": "equip", "Ritual": "ritual", "Counter": "counter"}
@@ -31,16 +32,25 @@ def card_status(card: dict) -> str:
     return ""
 
 
+def genesys_points(card: dict) -> int:
+    """A YGOPRODeck card entry's cost in the Genesys format (0 for most cards)."""
+    misc = card.get('misc_info') or [{}]
+    try:
+        return max(0, int(misc[0].get('genesys_points') or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def card_info(card: dict) -> dict:
-    """A YGOPRODeck card entry's kind (monster, spell_<subtype>, trap_<subtype>), level and
-    status (see card_status)."""
+    """A YGOPRODeck card entry's kind (monster, spell_<subtype>, trap_<subtype>), level, status
+    (see card_status) and Genesys points."""
     frame = card.get('frameType', '')
-    status = card_status(card)
+    rest = {"status": card_status(card), "points": genesys_points(card)}
     if frame in ('spell', 'trap'):
-        return {"kind": f"{frame}_{SUBTYPES.get(card.get('race', ''), 'normal')}", "level": 0, "status": status}
+        return {"kind": f"{frame}_{SUBTYPES.get(card.get('race', ''), 'normal')}", "level": 0, **rest}
     if 'Monster' in card.get('type', ''):
-        return {"kind": "monster", "level": int(card.get('level') or 0), "status": status}
-    return {"kind": "", "level": 0, "status": status}
+        return {"kind": "monster", "level": int(card.get('level') or 0), **rest}
+    return {"kind": "", "level": 0, **rest}
 
 
 def _remember_card(card: dict) -> str:
@@ -137,12 +147,16 @@ def fetch_card_infos(card_ids: List[str]) -> Dict[str, dict]:
             fetch_edopro_card_names(still_missing)
             if answered:
                 cache.remember_unknown([cid for cid in still_missing if cid not in cache.info])
-    return {cid: cache.info.get(cid, {"kind": "", "level": 0, "status": ""}) for cid in card_ids}
+    return {cid: cache.info.get(cid, {"kind": "", "level": 0, "status": "", "points": 0}) for cid in card_ids}
 
 
 def _lookup(card_ids: List[str]) -> Tuple[List[dict], bool]:
     """YGOPRODeck's entries for these IDs, and whether it answered (if it couldn't be reached,
     the cards it didn't return may still exist)."""
+    # Its whole card list is loaded and these aren't in it: YGOPRODeck doesn't know them either
+    # (until its next version), so made-up IDs can't spend its request budget (cards/http.py)
+    if cache.full_list:
+        return [], True
     try:
         data = fetch_json(CARDINFO_URL.format(ids=",".join(card_ids)), timeout=20)
         return list(data.get('data', [])), True

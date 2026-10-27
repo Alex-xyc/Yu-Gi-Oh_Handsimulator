@@ -22,6 +22,9 @@ export interface DeckCard {
   level?: number;
   /** As of when the deck was loaded (useBanStatus has the current one) */
   status?: BanStatus;
+  /** Its cost in the Genesys format, as of when the deck was loaded (useGenesysPoints has the
+   *  current one) */
+  points?: number;
 }
 
 export interface Counts {
@@ -137,10 +140,10 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 export const api = {
   /** The main deck and the side deck (empty if it has none) */
   loadDeck: (code: string) => post<{ cards: DeckCard[]; side: DeckCard[]; size: number }>("/api/decks", { code }),
-  /** Each card's kind, level and banlist status by ID (for decks saved before the card list had
-   *  them, and the current status) */
+  /** Each card's kind, level, banlist status and Genesys points by ID (for decks saved before the
+   *  card list had them, and the current status and points) */
   cardInfo: (ids: string[]) =>
-    post<Record<string, { kind: string; level: number; status?: BanStatus }>>("/api/decks/info", { ids }),
+    post<Record<string, { kind: string; level: number; status?: BanStatus; points?: number }>>("/api/decks/info", { ids }),
   /** handSize 6 gives the odds going second */
   stats: (deck: DeckSetupBody, signal?: AbortSignal, handSize = 5) =>
     post<Stats>(`/api/stats?hand_size=${handSize}`, deck, signal),

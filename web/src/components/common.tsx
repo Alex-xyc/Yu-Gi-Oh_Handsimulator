@@ -6,16 +6,42 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cardImageUrl, loadedImages, percent, percentDigits } from "../api";
-import { useBanStatus } from "../banStatus";
+import { cardImageUrl, type DeckCard, loadedImages, percent, percentDigits } from "../api";
+import { GENESYS_CAP, genesysTotal, useBanStatus, useGenesys, useGenesysPoints, useGenesysTotal } from "../banStatus";
 
 const IMAGE_RETRY_MS = 30_000;
 
-/** The banlist icon in a card's top right corner: a red ring on black (struck through when
- *  forbidden, else a yellow 1 or 2), or a red-framed "OCG" for a card not out in the TCG yet */
+/** A card's top right corner: its TCG banlist icon, or in Genesys mode its points */
 function BanMark({ id }: { id?: string }) {
+  return useGenesys() ? <PointsMark id={id} /> : <BanlistMark id={id} />;
+}
+
+/** A card's Genesys points in the banlist icons' style: a yellow number on black in a red-ringed
+ *  pill (a pill, not a circle, so 1 or 2 points don't read as Limited or Semi-Limited). None for
+ *  a card worth 0, like an unlimited card's banlist icon. */
+function PointsMark({ id }: { id?: string }) {
+  const { t } = useTranslation();
+  const points = useGenesysPoints(id);
+  if (!points) return null;
+  const text = String(points);
+  // Wide enough for its digits; the CSS sizes it to match (--w)
+  const width = 12 + 9 * text.length;
+  const label = t("genesys.cardPoints", { count: points });
+  return (
+    <span className="ban-mark points" style={{ ["--w" as string]: width }} role="img" aria-label={label} title={label}>
+      <svg viewBox={`0 0 ${width} 24`} aria-hidden="true">
+        <rect x="1.75" y="1.75" width={width - 3.5} height="20.5" rx="10.25" className="ban-face" />
+        <text x={width / 2} y="13" className="ban-text" fontSize="14">{text}</text>
+      </svg>
+    </span>
+  );
+}
+
+/** The banlist icon: a red ring on black (struck through when forbidden, else a yellow 1 or 2),
+ *  or a red-framed "OCG" for a card not out in the TCG yet */
+function BanlistMark({ id }: { id?: string }) {
   const { t } = useTranslation();
   const status = useBanStatus(id);
   if (!status) return null;
@@ -39,6 +65,26 @@ function BanMark({ id }: { id?: string }) {
         </svg>
       )}
     </span>
+  );
+}
+
+/** The deck's Genesys points (main and side deck: Genesys counts both) out of the cap, red when
+ *  over it; hovering shows the split. Shown in Genesys mode only. */
+export function GenesysTotal({ cards, side }: { cards: DeckCard[]; side: DeckCard[] | null }) {
+  const { t } = useTranslation();
+  const all = useMemo(() => [...cards, ...(side ?? [])], [cards, side]);
+  const total = useGenesysTotal(all);
+  if (!useGenesys()) return null;
+  const over = total !== null && total > GENESYS_CAP;
+  const title = total === null ? t("genesys.totalLoading")
+    : t("genesys.totalTitle", { main: genesysTotal(cards) ?? 0, side: genesysTotal(side ?? []) ?? 0, cap: GENESYS_CAP })
+      + (over ? ` ${t("genesys.overCap", { count: total - GENESYS_CAP, cap: GENESYS_CAP })}` : "");
+  return (
+    <Tooltip title={title}>
+      <span className={`genesys-total ${over ? "over" : ""}`}>
+        {t("genesys.total", { total: total ?? "…", cap: GENESYS_CAP })}
+      </span>
+    </Tooltip>
   );
 }
 

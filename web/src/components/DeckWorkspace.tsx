@@ -9,7 +9,7 @@ import { api, type DrawResult, prefetchCardImages, type Stats } from "../api";
 import { countLabels, type CustomLabelCount, type CustomLabelOf, useLabelSettings } from "../customLabels";
 import { exportStats } from "../export";
 import type { DeckSetup } from "../useDeckSetup";
-import { Overlay, SectionHeader, Spinner } from "./common";
+import { GenesysTotal, Overlay, SectionHeader, Spinner } from "./common";
 import { DeckLoader } from "./DeckPanel";
 import { ExportButton } from "./ExportButton";
 import { SortControls, TagControls, TagGrid, TagHistoryButtons, useDeckOrder, useTagEditor } from "./DecklistView";
@@ -167,7 +167,9 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
         <section className="card-panel flex min-w-0 flex-col max-lg:max-h-[560px] lg:h-0 lg:min-h-full"
                  aria-labelledby={`${id}-list`}>
           <SectionHeader as="h2" id={`${id}-list`} title={t("workspace.decklist")}
-                         hint={setup.cards ? t("common.deckSize", { count: setup.size }) : undefined}
+                         hint={setup.cards ? (
+                           <>{t("common.deckSize", { count: setup.size })}<GenesysTotal cards={setup.cards} side={setup.side} /></>
+                         ) : undefined}
                          action={setup.cards ? (
                            <div className="flex flex-wrap items-center gap-3">
                              <SortControls deckOrder={deckOrder} />

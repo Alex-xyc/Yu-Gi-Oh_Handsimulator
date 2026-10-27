@@ -7,7 +7,8 @@ once and serves its own copy. get_card_image looks in turn at:
    common case never waits for a worker thread;
 2. the cache folder: on Cloud Run a Cloud Storage bucket, where every file read takes a
    noticeable moment, so it is read in a worker thread (and the image kept in memory);
-3. the image sites (throttled in cards/http.py), in a worker thread. Only a few requests may
+3. the image sites (throttled in cards/http.py), in a worker thread, for cards the server knows
+   (made-up IDs are never downloaded). Only a few requests may
    wait for a download at once, so downloads can't tie up the threads every other request
    needs; past that the caller is told to try again shortly. A freshly downloaded image is
    sent straight away and written to the cache folder in the background.
@@ -18,13 +19,13 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from starlette.concurrency import run_in_threadpool
 
 from ..cards import cache
 from ..cards.edopro import EDOPRO_IMAGE_URL
-from ..cards.http import fetch_bytes
+from ..cards.http import HostBusyError, fetch_bytes
 
 YGOPRODECK_IMAGE_URLS = {
     "small": "https://images.ygoprodeck.com/images/cards_small/{card_id}.jpg",
@@ -48,6 +49,8 @@ MAX_MISSING = 10_000
 # stay free for everything else. Past this, requests are told to try again after BUSY_RETRY_SECONDS.
 MAX_DOWNLOADS_WAITING = 16
 BUSY_RETRY_SECONDS = 5
+# Prefetching images ahead of visitors (prefetch_images) waits this long when a site is busy
+BUSY_PAUSE_SECONDS = 60
 
 
 class ImageUnavailable(Exception):
@@ -143,6 +146,14 @@ async def get_card_image(card_id: str, size: str) -> Optional[bytes]:
     data = await run_in_threadpool(_from_disk, card_id, size)
     if data is not None:
         return data
+    # Only cards the server knows (the card list, or a deck lookup) are downloaded, so made-up IDs
+    # can't spend the image sites' budget (cards/http.py) that every visitor shares. A real card
+    # not looked up yet (a saved deck, just after a restart) is being looked up as the page asks
+    # for its picture, so the page is told to try again shortly; nothing is remembered for it.
+    if card_id not in cache.names:
+        if cache.recently_unknown(card_id):
+            return None
+        raise ImageUnavailable(BUSY_RETRY_SECONDS)
     # Taken without waiting (a `with` block would wait for one), and released below
     if not _download_slots.acquire(blocking=False):  # pylint: disable=consider-using-with
         raise ImageUnavailable(BUSY_RETRY_SECONDS)
@@ -257,6 +268,41 @@ def _save(key: str, path: str, data: bytes):
     finally:
         # Only now: until the file is in place, requests are answered from memory
         _saving.pop(key, None)
+
+
+def prefetch_images(card_ids: Iterable[str], size: str, per_second: float, stop: threading.Event) -> int:
+    """Download the images of these cards that aren't in the cache folder yet, from YGOPRODeck,
+    at most per_second a second, until done or stop is set; returns how many were downloaded.
+    Blocks (it's run in a background thread). Nothing is kept in memory, so the images
+    visitors are looking at stay there."""
+    folder = image_cache_dir()
+    gap = 1 / per_second
+    downloaded = failed = 0
+    for card_id in card_ids:
+        if stop.is_set():
+            break
+        key = _key(card_id, size)
+        path = os.path.join(folder, f"{key}.jpg")
+        if os.path.exists(path) or key in _saving:
+            continue
+        started = time.monotonic()
+        try:
+            data = fetch_bytes(image_urls(card_id, size)[0], timeout=10, max_bytes=MAX_IMAGE_BYTES)
+        except HostBusyError:
+            # The site asked us to slow down, or visitors are using its share: give way to them
+            stop.wait(BUSY_PAUSE_SECONDS)
+            continue
+        except Exception as e:
+            # A 404 means YGOPRODeck has no picture for it; a visitor's request will try EDOPro
+            if getattr(e, "code", None) != 404:
+                failed += 1
+            continue
+        _save(key, path, data)
+        downloaded += 1
+        stop.wait(max(0.0, gap - (time.monotonic() - started)))
+    if failed:
+        logging.warning("Prefetching %s card images: %d failed (tried again on the next pass)", size, failed)
+    return downloaded
 
 
 def _remember(keys: Dict[str, float], key: str, seconds: float):

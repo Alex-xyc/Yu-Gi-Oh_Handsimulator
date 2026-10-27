@@ -32,4 +32,8 @@ ENV YGO_CACHE_DIR=/cache LOCALAPPDATA=/cache HOST=0.0.0.0 PORT=8000 PYTHONDONTWR
 # leftmost address, which the visitor sends themselves and can set to anything.) Unset, the
 # connecting address is used, which is right when the container is reached directly.
 EXPOSE 8000
+# Healthy once the page is served (python, as the slim image has no curl); the Deploy workflow's
+# `docker compose up --wait` waits for this, and rolls back if it never comes
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['PORT'] + '/', timeout=3)"
 CMD ["python", "src/web.py"]

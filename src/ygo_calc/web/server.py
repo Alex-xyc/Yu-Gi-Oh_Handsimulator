@@ -4,7 +4,7 @@ The server keeps no per-user state: the browser holds the deck and its tags or
 counts and sends them with each request.
 
     POST /api/decks                  deck code -> main and side deck card lists
-    POST /api/decks/info             card IDs -> each card's kind, level and banlist status (for
+    POST /api/decks/info             card IDs -> each card's kind, level, banlist status and Genesys points (for
                                      decks saved before the card list had them, and a fresh status)
     POST /api/stats                  deck setup -> opening-hand odds
     POST /api/draw                   deck setup -> random hand, next draws, shuffled deck + odds for it
@@ -20,6 +20,7 @@ Copyright (c) 2026 Alex-xyc
 import os
 import random
 import re
+from contextlib import asynccontextmanager
 from typing import List, Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
@@ -36,6 +37,7 @@ from ..core.deck_parser import DeckParseError
 from ..core.stats import opening_stats
 from ..deck_loading import load_main_deck, load_side_deck
 from ..paths import SRC_DIR
+from . import prefetch
 from .images import SIZES, ImageUnavailable, get_card_image
 from .security import SecurityMiddleware
 
@@ -111,9 +113,18 @@ class CompareRequest(BaseModel):
 
 # The app
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Card data and images are fetched in the background while the server runs (prefetch.py)."""
+    stop = prefetch.start() if prefetch.ENABLED else None
+    yield
+    if stop:
+        stop.set()
+
+
 # The interactive docs are off on a public server unless asked for
 API_DOCS = os.environ.get("YGO_API_DOCS") == "1"
-app = FastAPI(title="YGO Calc", redoc_url=None,
+app = FastAPI(title="YGO Calc", redoc_url=None, lifespan=lifespan,
               docs_url="/api/docs" if API_DOCS else None,
               openapi_url="/api/openapi.json" if API_DOCS else None)
 app.add_middleware(SecurityMiddleware)
@@ -126,8 +137,8 @@ CARD_ID = re.compile(r"[0-9]{1,10}")
 def load_deck(body: DeckCode):
     """Look up a ydke:// code or .ydk file text; returns the main and side decks in deck order,
     with each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown) and level for
-    sorting, and its TCG status (banned, limited, semi_limited, ocg for not out in the TCG yet, or
-    "")."""
+    sorting, its TCG status (banned, limited, semi_limited, ocg for not out in the TCG yet, or
+    "") and its Genesys points."""
     deck = YuGiOhDeck()
     try:
         card_ids = load_main_deck(deck, body.code)
@@ -151,7 +162,7 @@ class CardIds(BaseModel):
 @app.post("/api/decks/info")
 def card_infos(body: CardIds):
     """Each card's kind (monster, spell_<subtype>, trap_<subtype>; "" if unknown), level and TCG
-    status (banned, limited, semi_limited, ocg or "")."""
+    status (banned, limited, semi_limited, ocg or "") and Genesys points."""
     ids = [cid for cid in dict.fromkeys(body.ids) if CARD_ID.fullmatch(cid)]
     return fetch_card_infos(ids)
 
@@ -215,5 +226,18 @@ async def card_image(card_id: str, size: Literal["small", "full"] = "small"):
     return Response(image, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000, immutable"})
 
 
+class WebFiles(StaticFiles):
+    """The built front end. Files under assets/ have a content hash in their name, so browsers may
+    keep them for good; everything else (index.html above all) is checked with the server on each
+    use, so a page loaded after a deploy never asks for the old build's assets, which are gone."""
+
+    async def get_response(self, path: str, scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            hashed = path.replace(os.sep, "/").startswith("assets/")
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if hashed else "no-cache"
+        return response
+
+
 if os.path.isdir(WEB_DIST):
-    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+    app.mount("/", WebFiles(directory=WEB_DIST, html=True), name="web")
