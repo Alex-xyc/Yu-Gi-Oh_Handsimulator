@@ -12,6 +12,9 @@ export default {
       borderRadius: radius,
       boxShadow: shadow,
       fontFamily: { sans: font.sans, mono: font.mono },
+      // Where a deck tab's panels go side by side: wider than landscape tablets (up to ~1180px),
+      // which get the roomier one-column layout
+      screens: { wide: "75rem" },
     },
   },
   plugins: [
