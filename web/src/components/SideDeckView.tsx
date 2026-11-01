@@ -1,7 +1,8 @@
 // Siding: the main deck above the side deck, 10 cards per row (5 when that makes them bigger, on a phone). Click main deck cards to side them
 // out and side deck cards to side them in; Swap trades them once as many go in as come out, so the
-// main deck keeps its size. The cards are sized so both decks always fit the window, without
-// scrolling (as the shuffled deck).
+// main deck keeps its size. The cards are sized so both decks fit the window without scrolling,
+// except on phones: there it's always 5 per row, as wide as the screen, and the decks scroll (as
+// the shuffled deck).
 
 import Button from "@mui/material/Button";
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +18,8 @@ const HEADING = 28; // a deck's title line (h-7)
 const SECTION_GAP = 14; // between the two decks (gap-3.5)
 const OUTLINE = 6; // a picked card's outline, so the top and bottom rows' isn't cut off
 const CARD_RATIO = 59 / 86; // width / height, as .card-image
+// Phones (below Tailwind's sm breakpoint)
+const PHONE = "(max-width: 639px)";
 
 type Pick = "out" | "in";
 
@@ -45,7 +48,7 @@ function DeckGrid({ title, list, tags, moved, movedLabel, picked, pick, idByName
   const { t } = useTranslation();
   const verb = pick === "out" ? t("side.sideOut") : t("side.sideIn");
   return (
-    <section className="flex min-h-0 flex-col" aria-label={title}>
+    <section className="flex min-h-0 flex-col max-sm:shrink-0" aria-label={title}>
       <h3 className="m-0 flex h-7 items-center gap-2">
         {title} <span className="font-normal text-muted">{t("common.deckSize", { count: list.length })}</span>
         {picked.size > 0 && (
@@ -130,7 +133,13 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
       const byHeight = (height / rows) * CARD_RATIO;
       return Math.max(0, Math.floor(Math.min(byWidth, byHeight)));
     };
+    const phone = window.matchMedia(PHONE);
     const fitCards = () => {
+      if (phone.matches) {
+        setColumns(5);
+        setCardWidth(Math.max(0, Math.floor((el.clientWidth - 4 * GAP) / 5)));
+        return;
+      }
       const best = COLUMN_CHOICES.reduce((a, b) => (widthFor(b) > widthFor(a) ? b : a));
       setColumns(best);
       setCardWidth(widthFor(best));
@@ -138,7 +147,11 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
     fitCards();
     const observer = new ResizeObserver(fitCards);
     observer.observe(el);
-    return () => observer.disconnect();
+    phone.addEventListener("change", fitCards);
+    return () => {
+      observer.disconnect();
+      phone.removeEventListener("change", fitCards);
+    };
   }, [deckList.length, sideList.length]);
 
   return (
@@ -163,7 +176,7 @@ export function SideDeckView({ setup, onClose }: { setup: DeckSetup; onClose: ()
           <Button color="inherit" onClick={onClose}>{t("common.close")}</Button>
         </div>
       </div>
-      <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
+      <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden max-sm:overflow-y-auto max-sm:overscroll-contain">
         <DeckGrid title={t("side.mainDeck")} list={deckList} tags={tags} moved={setup.sided} movedLabel={t("side.sidedIn")} picked={out} pick="out" idByName={idByName}
                   columns={columns} cardWidth={cardWidth} onToggle={(i) => setOut(toggled(out, i))} />
         <DeckGrid title={t("side.sideDeck")} list={sideList} tags={setup.sideTags} moved={setup.sideFromMain} movedLabel={t("side.sidedOut")}

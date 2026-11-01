@@ -38,7 +38,7 @@ function GenesysSwitch() {
   const genesys = useGenesys();
   return (
     <Tooltip title={genesys ? t("genesys.toggleOff") : t("genesys.toggleOn")}>
-      <FormControlLabel className="m-0" label={t("genesys.toggle")} labelPlacement="start"
+      <FormControlLabel className="m-0 whitespace-nowrap" label={t("genesys.toggle")} labelPlacement="start"
                         control={<Switch size="small" checked={genesys} onChange={(e) => setGenesys(e.target.checked)} />} />
     </Tooltip>
   );
@@ -115,7 +115,7 @@ export default function App() {
               <span className="muted small">{t("app.tagline")}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="topbar-actions">
             <GenesysSwitch />
             <Button variant="outlined" color="primary" onClick={() => setComparing(true)}>
               <span className="max-sm:hidden">{t("app.compareLong")}</span><span className="sm:hidden">{t("app.compareShort")}</span>

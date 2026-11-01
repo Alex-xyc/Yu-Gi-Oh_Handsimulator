@@ -141,15 +141,15 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
       {/* Left: labelling controls above the test hand. Right: only the decklist, which fills
           the left column's height (h-0 + min-h-full) and scrolls inside it. The decklist gets
           two thirds of the width so its 10-card rows stay a readable size.
-          Narrower, it's one column: the left panel splits into two panels (max-lg:contents),
+          Narrower, it's one column: the left panel splits into two panels (max-wide:contents),
           the test hand first, then the labelling, then the decklist. */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="card-panel flex min-w-0 flex-col gap-5 max-lg:contents" aria-labelledby={`${id}-label`}>
+      <div className="grid gap-4 wide:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <section className="card-panel flex min-w-0 flex-col gap-5 max-wide:contents" aria-labelledby={`${id}-label`}>
           <div className="workspace-part min-w-0">
             <SectionHeader as="h2" id={`${id}-label`} title={t("workspace.labelDecklist")} action={<TagHistoryButtons editor={editor} />} />
             <TagControls editor={editor} />
           </div>
-          <div className="workspace-part flex min-w-0 flex-col max-lg:-order-1 lg:border-t lg:border-line lg:pt-4">
+          <div className="workspace-part flex min-w-0 flex-col max-wide:-order-1 wide:border-t wide:border-line wide:pt-4">
             <SectionHeader as="h2" title={t("workspace.testHand")} action={
               <div className="flex flex-wrap justify-end gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-2">
                 <Button variant="outlined" onClick={() => setShowingDeck(true)} disabled={!draw}>
@@ -164,7 +164,7 @@ export function DeckWorkspace({ setup, name, active, shortcuts, onError }: {
           </div>
         </section>
 
-        <section className="card-panel flex min-w-0 flex-col max-lg:max-h-[560px] lg:h-0 lg:min-h-full"
+        <section className="card-panel flex min-w-0 flex-col max-wide:max-h-[560px] wide:h-0 wide:min-h-full"
                  aria-labelledby={`${id}-list`}>
           <SectionHeader as="h2" id={`${id}-list`} title={t("workspace.decklist")}
                          hint={setup.cards ? (

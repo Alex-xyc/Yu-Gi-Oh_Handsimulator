@@ -297,19 +297,21 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
               ))}
             </div>
           </div>
-          <table className="data-table mt-4">
-            <CopyOddsHead />
-            <tbody>
-              {sidedCards.map((card) => (
-                <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
-                  {card.name}
-                  {card.sided < card.copies && (
-                    <span className="muted small"> · {t("stats.sidedOf", { sided: card.sided, copies: card.copies })}</span>
-                  )}
-                </CopyOddsRow>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll mt-4">
+            <table className="data-table">
+              <CopyOddsHead />
+              <tbody>
+                {sidedCards.map((card) => (
+                  <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
+                    {card.name}
+                    {card.sided < card.copies && (
+                      <span className="muted small"> · {t("stats.sidedOf", { sided: card.sided, copies: card.copies })}</span>
+                    )}
+                  </CopyOddsRow>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Section>
       )}
 
@@ -349,23 +351,25 @@ export const StatsView = memo(function StatsView({ stats, tagged, hasHand, sided
       </Section>
 
       <Section title={t("stats.cardOdds")} hint={t("stats.cardOddsHint")}>
-        <table className="data-table">
-          <CopyOddsHead />
-          {GROUPS.map((key) => {
-            const cards = stats.cards.filter((c) => c.group === key);
-            if (!cards.length) return null;
-            return (
-              <tbody key={key}>
-                {grouped && <tr className="group-row"><td colSpan={3 + 2 * COPIES.length}><Dot tone={key} />{t(`categories.${key}`)}</td></tr>}
-                {cards.map((card) => (
-                  <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
-                    {card.name}
-                  </CopyOddsRow>
-                ))}
-              </tbody>
-            );
-          })}
-        </table>
+        <div className="table-scroll">
+          <table className="data-table">
+            <CopyOddsHead />
+            {GROUPS.map((key) => {
+              const cards = stats.cards.filter((c) => c.group === key);
+              if (!cards.length) return null;
+              return (
+                <tbody key={key}>
+                  {grouped && <tr className="group-row"><td colSpan={3 + 2 * COPIES.length}><Dot tone={key} />{t(`categories.${key}`)}</td></tr>}
+                  {cards.map((card) => (
+                    <CopyOddsRow key={card.name} copies={card.copies} deckSize={stats.deck_size} handSize={stats.hand_size}>
+                      {card.name}
+                    </CopyOddsRow>
+                  ))}
+                </tbody>
+              );
+            })}
+          </table>
+        </div>
       </Section>
     </div>
   );
